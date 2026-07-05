@@ -1,4 +1,11 @@
-from sqlalchemy import MetaData
+from sqlalchemy import create_engine
+from sqlalchemy.orm import DeclarativeBase
 
-# the equivalent of declarative base in sqlalchemy
-metadata_obj = MetaData()
+from src.core.config import settings
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+engine = create_engine(settings.database_url)

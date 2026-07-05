@@ -1,35 +1,36 @@
 import uuid
-from enum import StrEnum
+from datetime import datetime
 
-from database.database import metadata_obj
-from sqlalchemy import DATETIME, UUID, Column, Enum, Index, Integer, String, Table
+from sqlalchemy import DATETIME, TIMESTAMP, Enum, Index, String
+from sqlalchemy.orm import Mapped, mapped_column
 
-
-class TransactionStates(StrEnum):
-    PENDING = "pending"
-    AUTHORIZED = "authorized"
-    VOIDED = "voided"
-    CAPTURED = "captured"
-    REFUNDED = "refunded"
+from src.database.database import Base
+from src.enums.transaction_states import TransactionStates
 
 
-payment_receipt = Table(
-    "payment_receipt",
-    metadata_obj,
-    Column("id", UUID, primary_key=True, default=uuid.uuid4),
-    Column("order_id", Integer, nullable=False, index=True),
-    Column("customer_id", Integer, nullable=False, index=True),
-    Column("amount_cents", Integer, nullable=False),
-    Column("current_state", Enum(TransactionStates), nullable=False),
-    Column("authorization_id", String(100), nullable=True),
-    Column("capture_id", String(100), nullable=True),
-    Column("void_id", String(100), nullable=True),
-    Column("refund_id", String(100), nullable=True),
-    Column("expires_at", DATETIME(timezone=True), nullable=True),
-    Column("captured_at", DATETIME(timezone=True), nullable=True),
-    Column("voided_at", DATETIME(timezone=True), nullable=True),
-    Column("refunded_at", DATETIME(timezone=True), nullable=True),
-    Column("state_transitioned_at", DATETIME(timezone=True)),
-    # Composite Index on order and transaction state
-    Index("idx_order_id_transaction_state", "order_id", "current_state"),
-)
+class PaymentReceipt(Base):
+    __tablename__ = "payment_receipt"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    order_id: Mapped[int] = mapped_column(index=True)
+    customer_id: Mapped[int] = mapped_column(index=True)
+    amount_cents: Mapped[int]
+    current_state: Mapped[TransactionStates] = mapped_column(
+        Enum(TransactionStates), default=TransactionStates.PENDING
+    )
+    authorization_id: Mapped[str | None] = mapped_column(String(100))
+    capture_id: Mapped[str | None] = mapped_column(String(100))
+    void_id: Mapped[str | None] = mapped_column(String(100))
+    refund_id: Mapped[str | None] = mapped_column(String(100))
+    expires_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
+    captured_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
+    voided_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
+    refunded_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
+    state_transitioned_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True)
+    )
+
+    __table_args__ = (
+        Index("idx_order_id_transaction_state", "order_id", "current_state"),
+        Index("idx_customer_id", "customer_id"),
+    )
