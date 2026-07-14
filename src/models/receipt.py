@@ -1,11 +1,11 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DATETIME, TIMESTAMP, Enum, Index, String
+from sqlalchemy import TIMESTAMP, Enum, Index, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.database.database import Base
-from src.enums.transaction_states import TransactionStates
+from src.core.state_machine import TransactionStates
 
 
 class PaymentReceipt(Base):

@@ -5,7 +5,7 @@ from sqlalchemy import TIMESTAMP, Enum, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.database.database import Base
-from src.enums.transaction_states import TransactionStates
+from src.core.state_machine import TransactionStates
 
 
 class StateHistory(Base):
