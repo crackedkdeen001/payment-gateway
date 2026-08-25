@@ -35,7 +35,9 @@ services:
       
       # Don't require a "master" password after logging in
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
-
+    networks:
+      - bank-network
+  
   bank-api:
     build:
       context: ..
