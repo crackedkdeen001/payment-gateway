@@ -4,8 +4,8 @@ services:
     container_name: payment_gateway
     restart: always
     environment:
-      POSTGRES_USER: kamal
-      POSTGRES_PASSudoORD: kdeen265
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: 2099_gateway
     ports:
       - "5433:5432"
