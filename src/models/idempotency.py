@@ -3,12 +3,12 @@ from datetime import datetime
 from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from models.receipt import Receipt
+from src.models.receipt import Receipt
 from src.db.setup import Base
 
 
 class IdempotencyKeys(Base):
-    __table_name__ = "idempotency_keys"
+    __tablename__ = "idempotency_keys"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     idempotency_key: Mapped[str] = mapped_column(String(100))

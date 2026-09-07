@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy import DateTime, Enum, Integer, String, Uuid, func
@@ -7,7 +8,11 @@ from sqlalchemy.schema import Index
 
 from src.db.custom_types import MyRefID
 from src.db.setup import Base
-from src.models.idempotency import IdempotencyKeys
+
+# prevents circular imports
+if TYPE_CHECKING:
+    from src.models.idempotency import IdempotencyKeys
+    
 from src.models.states import PaymentStates
 
 
@@ -19,7 +24,7 @@ class Receipt(Base):
     )
 
     id: Mapped[int] = mapped_column(MyRefID, primary_key=True)
-    order_id: Mapped[UUID] = mapped_column(Uuid, default_factory=uuid4)
+    order_id: Mapped[UUID] = mapped_column(Uuid, default=uuid4)
     customer_id: Mapped[int] = mapped_column(Integer, autoincrement=True)
     
     card_number: Mapped[str] = mapped_column(String(40))
@@ -29,7 +34,7 @@ class Receipt(Base):
     current_state: Mapped[PaymentStates] = mapped_column(
         Enum(
             PaymentStates,
-            values_callable=lambda: [state.value for state in PaymentStates],
+            values_callable=lambda states: [state.value for state in states],
         ),
         default=PaymentStates.PENDING,
     )
@@ -49,5 +54,3 @@ class Receipt(Base):
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     
-    # for audit table records
-    updated_at: Mapped[datetime | None] = mapped_column(DateTime, onupdate=func.now())

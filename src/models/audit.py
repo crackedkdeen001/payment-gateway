@@ -16,10 +16,11 @@ The "action" column signifies action taken e.g created, deleted, updated
 
 
 class ReceiptAudit(Base):
+    __tablename__ = "receipt_audit"
+    
     id: Mapped[int] = mapped_column(primary_key=True)
-
     # columns of receipt table
-    order_id: Mapped[UUID] = mapped_column(Uuid, default_factory=uuid4)
+    order_id: Mapped[UUID] = mapped_column(Uuid, default=uuid4)
     customer_id: Mapped[int] = mapped_column(Integer, autoincrement=True)
     card_number: Mapped[str] = mapped_column(String(40))
     card_cvv: Mapped[str] = mapped_column(String(3))
@@ -27,8 +28,8 @@ class ReceiptAudit(Base):
     card_expiry_year: Mapped[int] = mapped_column(Integer)
     current_state: Mapped[PaymentStates] = mapped_column(
         Enum(
-            PaymentStates,
-            values_callable=lambda: [state.value for state in PaymentStates],
+            PaymentStates, 
+            values_callable= lambda e : [state.value for state in e]
         ),
         default=PaymentStates.PENDING,
     )
@@ -48,11 +49,10 @@ class ReceiptAudit(Base):
 
     receipt_id: Mapped[int] = mapped_column(ForeignKey("receipt.id", ondelete="RESTRICT"))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
-    updated_at: Mapped[datetime | None] = mapped_column(DateTime, onupdate=func.now())
     action: Mapped[str] = mapped_column(String(50))
 
 class IdempotencyAudit(Base):
-    __table_name__ = "idempotency_keys"
+    __tablename__ = "idempotency_audit"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     idempotency_key: Mapped[str] = mapped_column(String(100))
