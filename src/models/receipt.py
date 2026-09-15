@@ -5,11 +5,10 @@ from models import BankReference, BaseModel, Card, PaymentStates
 
 
 class Receipt(BaseModel):
-    id: int 
+    id: int
     order_id: UUID
     customer_id: int
     card: Card
     current_state: PaymentStates
     created_at: datetime
     bank_reference: BankReference
-    

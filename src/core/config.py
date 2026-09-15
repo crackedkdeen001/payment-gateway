@@ -19,5 +19,3 @@ class Config(BaseSettings):
     model_config = SettingsConfigDict(**env_args)
     
     database_url: str
-    
-settings = Config()
