@@ -27,7 +27,7 @@ def upgrade() -> None:
         CREATE TABLE receipts (
         id SERIAL PRIMARY KEY,
         order_id UUID UNIQUE NOT NULL,
-        customer_id INTEGER NOT NULL UNIQUE,
+        customer_id INTEGER NOT NULL,
         amount_in_cents DECIMAL NOT NULL,
         currency VARCHAR(3) NOT NULL,
         card_number VARCHAR(100) NOT NULL,
