@@ -1,15 +1,15 @@
 from datetime import datetime
 
-from models import BaseModel
+from ..models import BaseModel
 
 
 class BankReference(BaseModel):
-    authorized_id: str
-    authorized_at: datetime
-    captured_id: str
-    captured_at: datetime
-    voided_id: str
-    voided_at: datetime
-    refunded_id: str
-    refunded_at: datetime
+    authorize_id: str | None 
+    authorized_at: datetime | None
+    capture_id: str | None
+    captured_at: datetime | None
+    void_id: str | None
+    voided_at: datetime | None
+    refund_id: str | None
+    refunded_at: datetime | None
 

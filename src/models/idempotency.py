@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from models import BaseModel
+from ..models import BaseModel
 
 
 class IdempotencyKeys(BaseModel):
