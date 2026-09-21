@@ -61,6 +61,8 @@ def upgrade() -> None:
                         NEW.voided_at = now();
                     WHEN 'refunded' THEN
                         NEW.refunded_at = now();
+                    ELSE
+                        NULL;
                 END CASE;
             RETURN NEW;
             END
@@ -80,15 +82,16 @@ def upgrade() -> None:
         CREATE TABLE idempotency_keys 
         (
             id SERIAL PRIMARY KEY,
-            idempotency_key VARCHAR(100),
+            idempotency_key VARCHAR(100) NOT NULL,
 
             request_path VARCHAR(100) NOT NULL,
             request_params JSONB NOT NULL,
 
             response_body JSONB,
-            response_status INTEGER,
-
-            receipt_id INTEGER references receipts (id) NOT NULL 
+            response_code INTEGER,
+            
+            receipt_id INTEGER references receipts (id) NOT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW()
         );
 
         -- receipt audit table
@@ -103,7 +106,7 @@ def upgrade() -> None:
             card_number       VARCHAR(100)                                                   NOT NULL,
             card_cvv          VARCHAR(3)                                                     NOT NULL,
             card_expiry_month INT CHECK (card_expiry_month >= 1 AND card_expiry_month <= 12) NOT NULL,
-            card_expiry_year  INTEGER CHECK ( card_expiry_year >= 1000)                      NOT NULL,
+            card_expiry_year  INTEGER CHECK ( card_expiry_year >= 1)                         NOT NULL,
             current_state     payment_states           DEFAULT 'pending'                     NOT NULL,
             created_at        TIMESTAMP with time zone DEFAULT current_timestamp,
             authorize_id     VARCHAR(100),
