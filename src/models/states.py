@@ -1,7 +1,8 @@
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel
+from . import Card
+from ..models import BaseModel
 
 
 # Payment states are stored in the database as an Enum
@@ -17,10 +18,7 @@ class PaymentStates(StrEnum):
 class GenericPayment(BaseModel):
     receipt_id: str
     order_id: str
-    card_number: str
-    card_cvv: str
-    card_expiry_month: int
-    card_expiry_year: int
+    card: Card
 
 
 class PendingPayment(GenericPayment):

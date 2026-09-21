@@ -9,4 +9,17 @@ dependencies = [
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.2",
     "pytest>=9.1.1",
+    "pytest-postgresql>=9.1.0",
 ]
+
+# makes postgresql fixture run in autocommit mode (no transactions)
+[tool.pytest.ini_options]
+postgresql_load_autocommit = true
+postgresql_host="localhost"
+postgresql_port="5450"
+postgresql_user="postgres"
+postgresql_password="postgres"
+postgresql_dbname="test_2099_gateway"
+
+[tool.ruff.lint]
+ignore = ["I001"]
