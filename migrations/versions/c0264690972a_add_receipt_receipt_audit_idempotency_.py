@@ -33,7 +33,7 @@ def upgrade() -> None:
         card_number VARCHAR(100) NOT NULL,
         card_cvv VARCHAR(3) NOT NULL,
         card_expiry_month INT CHECK (card_expiry_month >= 1 AND card_expiry_month <= 12) NOT NULL,
-        card_expiry_year INTEGER CHECK ( card_expiry_year >= 1000 ) NULL, 
+        card_expiry_year INTEGER CHECK ( card_expiry_year >= 1 ) NOT NULL, 
         current_state payment_states DEFAULT 'pending' NOT NULL,
         created_at TIMESTAMP with time zone DEFAULT current_timestamp,
         authorize_id VARCHAR(100),
@@ -82,7 +82,7 @@ def upgrade() -> None:
         CREATE TABLE idempotency_keys 
         (
             id SERIAL PRIMARY KEY,
-            idempotency_key VARCHAR(100) NOT NULL,
+            idempotency_key VARCHAR(100) UNIQUE NOT NULL ,
 
             request_path VARCHAR(100) NOT NULL,
             request_params JSONB NOT NULL,
@@ -90,7 +90,6 @@ def upgrade() -> None:
             response_body JSONB,
             response_code INTEGER,
             
-            receipt_id INTEGER references receipts (id) NOT NULL,
             created_at TIMESTAMP NOT NULL DEFAULT NOW()
         );
 
@@ -116,7 +115,7 @@ def upgrade() -> None:
             void_id         VARCHAR(100),
             voided_at         TIMESTAMP with time zone,
             refund_id       VARCHAR(100),
-            refunded_at       TIMESTAMP with time zone,
+            refunded_at`       TIMESTAMP with time zone,
             -- what action was performed on the receipts database
             action            TEXT  CHECK ( action in ('del','upd','ins'))                   NOT NULL
         );
