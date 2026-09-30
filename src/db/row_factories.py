@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 from psycopg import Cursor
 
-from ..models import BankReference, Card, Receipt, IdempotencyKeys
+from ..models import BankReference, Card, Receipt, IdempotencyKey
 
 
 class BaseRowFactory(ABC):
@@ -45,10 +45,3 @@ class ReceiptRowFactory(BaseRowFactory):
         receipt_params["bank_reference"] = BankReference(**bank_ref_params)
         
         return Receipt(**receipt_params)
-
-
-class IdempotencyRowFactory(BaseRowFactory):
-    def make_row(self, values: Sequence[Any]) -> IdempotencyKeys:
-        idem_params = dict(zip(self.fields, values))
-        return IdempotencyKeys(**idem_params)
-         
