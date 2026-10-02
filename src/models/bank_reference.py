@@ -1,7 +1,6 @@
 from datetime import datetime
 
-from ..models import BaseModel
-
+from src.models import BaseModel
 
 class BankReference(BaseModel):
     authorize_id: str | None 

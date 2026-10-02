@@ -25,99 +25,70 @@ def upgrade() -> None:
         CREATE TYPE payment_states as ENUM ('pending','authorized', 'captured', 'voided', 'refunded');
         
         CREATE TABLE receipts (
-        id SERIAL PRIMARY KEY,
-        order_id UUID UNIQUE NOT NULL,
-        customer_id INTEGER NOT NULL,
-        amount_in_cents DECIMAL NOT NULL,
-        currency VARCHAR(3) NOT NULL,
-        card_number VARCHAR(100) NOT NULL,
-        card_cvv VARCHAR(3) NOT NULL,
-        card_expiry_month INT CHECK (card_expiry_month >= 1 AND card_expiry_month <= 12) NOT NULL,
-        card_expiry_year INTEGER CHECK ( card_expiry_year >= 1 ) NOT NULL, 
-        current_state payment_states DEFAULT 'pending' NOT NULL,
-        created_at TIMESTAMP with time zone DEFAULT current_timestamp,
-        authorize_id VARCHAR(100),
-        authorized_at TIMESTAMP with time zone,
-        capture_id VARCHAR(100),
-        captured_at TIMESTAMP with time zone,
-        void_id VARCHAR(100),
-        voided_at TIMESTAMP with time zone,
-        refund_id VARCHAR(100),
-        refunded_at TIMESTAMP with time zone
-        );
-            
-        -- creates a function trigger function that automatically updates the bank-reference times
-        -- if the state changes
-        CREATE OR REPLACE FUNCTION set_bank_ref_time()
-        RETURNS TRIGGER
-        AS $func$
-            BEGIN 
-                CASE NEW.current_state
-                    WHEN 'authorized' THEN
-                        NEW.authorized_at = now();
-                    WHEN 'captured' THEN
-                        NEW.captured_at = now();
-                    WHEN 'voided' THEN
-                        NEW.voided_at = now();
-                    WHEN 'refunded' THEN
-                        NEW.refunded_at = now();
-                    ELSE
-                        NULL;
-                END CASE;
-            RETURN NEW;
-            END
-        $func$ LANGUAGE plpgsql;
-            
-        CREATE TRIGGER set_receipt_bank_ref_time
-        -- before adds the bank_ref time to the values being inserted before they are actually added to the the table 
-        BEFORE INSERT OR UPDATE ON receipts
-        FOR EACH ROW 
-            EXECUTE PROCEDURE set_bank_ref_time();
-            
+            id                  SERIAL PRIMARY KEY,                                                        
+            order_id            UUID                                                           NOT NULL,
+            customer_id         INT                                                            NOT NULL,
+            amount_in_cents     INT                                                            NOT NULL,
+            currency            VARCHAR(3)                                                     NOT NULL,
+            card_number         VARCHAR(100)                                                   NOT NULL,
+            card_cvv            VARCHAR(3)                                                     NOT NULL,
+            card_expiry_month   INT CHECK (card_expiry_month >= 1 AND card_expiry_month <= 12) NOT NULL,
+            card_expiry_year    INT CHECK (card_expiry_year >= 1)                              NOT NULL,
+            current_state       payment_states DEFAULT 'pending'                               NOT NULL,
+            authorize_id        VARCHAR(100),
+            authorized_at       TIMESTAMP,
+            auth_expiry         TIMESTAMP,
+            capture_id          VARCHAR(100),
+            captured_at         TIMESTAMP,
+            void_id             VARCHAR(100),
+            voided_at           TIMESTAMP,
+            refund_id           VARCHAR(100),
+            refunded_at         TIMESTAMP,
+            created_at          TIMESTAMP DEFAULT current_timestamp                            NOT NULL
+        );  
         CREATE INDEX receipts_order_id_idx ON receipts (order_id);
         CREATE INDEX receipts_customer_id_idx ON receipts (customer_id);
         
        -- idempotency table 
-            
         CREATE TABLE idempotency_keys 
         (
-            id SERIAL PRIMARY KEY,
-            idempotency_key VARCHAR(100) UNIQUE NOT NULL ,
-
-            request_path VARCHAR(100) NOT NULL,
-            request_params JSONB NOT NULL,
-
-            response_body JSONB,
-            response_code INTEGER,
-            
-            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+            id                  SERIAL PRIMARY KEY,
+            idempotency_key     VARCHAR(100)                                        NOT NULL,
+            request_path        VARCHAR(100)                                        NOT NULL,
+            request_body        JSONB                                               NOT NULL,
+            response_body       JSONB,
+            response_code       INTEGER,
+            created_at          TIMESTAMP DEFAULT current_timestamp                 NOT NULL
         );
-
-        -- receipt audit table
         
+        -- allows two different receipts to use the same idempotency key
+        CREATE UNIQUE INDEX idempotency_key_request_path_idx
+        ON idempotency_keys (idempotency_key, request_path);
+        
+        -- receipt audit table
         CREATE TABLE receipts_audit
-        (
-            receipt_id        INTEGER                                                        NOT NULL, 
-            order_id          UUID                                                           NOT NULL,
-            customer_id       INTEGER                                                        NOT NULL,
-            amount_in_cents   DECIMAL                                                        NOT NULL,
-            currency          VARCHAR(3)                                                     NOT NULL,
-            card_number       VARCHAR(100)                                                   NOT NULL,
-            card_cvv          VARCHAR(3)                                                     NOT NULL,
-            card_expiry_month INT CHECK (card_expiry_month >= 1 AND card_expiry_month <= 12) NOT NULL,
-            card_expiry_year  INTEGER CHECK ( card_expiry_year >= 1)                         NOT NULL,
-            current_state     payment_states           DEFAULT 'pending'                     NOT NULL,
-            created_at        TIMESTAMP with time zone DEFAULT current_timestamp,
-            authorize_id     VARCHAR(100),
-            authorized_at     TIMESTAMP with time zone,
-            capture_id        VARCHAR(100),
-            captured_at       TIMESTAMP with time zone,
-            void_id         VARCHAR(100),
-            voided_at         TIMESTAMP with time zone,
-            refund_id       VARCHAR(100),
-            refunded_at`       TIMESTAMP with time zone,
+        (   
+            receipt_id          INTEGER                                                        NOT NULL, 
+            order_id            UUID                                                           NOT NULL,
+            customer_id         INT                                                            NOT NULL,
+            amount_in_cents     INT                                                            NOT NULL,
+            currency            VARCHAR(3)                                                     NOT NULL,
+            card_number         VARCHAR(100)                                                   NOT NULL,
+            card_cvv            VARCHAR(3)                                                     NOT NULL,
+            card_expiry_month   INT CHECK (card_expiry_month >= 1 AND card_expiry_month <= 12) NOT NULL,
+            card_expiry_year    INT CHECK (card_expiry_year >= 1)                              NOT NULL,
+            current_state       payment_states DEFAULT 'pending'                               NOT NULL,
+            authorize_id        VARCHAR(100),
+            authorized_at       TIMESTAMP,
+            capture_id          VARCHAR(100),
+            captured_at         TIMESTAMP,
+            void_id             VARCHAR(100),
+            voided_at           TIMESTAMP,
+            refund_id           VARCHAR(100),
+            refunded_at         TIMESTAMP,
             -- what action was performed on the receipts database
-            action            TEXT  CHECK ( action in ('del','upd','ins'))                   NOT NULL
+            action              TEXT  CHECK ( action in ('del','upd','ins'))                   NOT NULL,
+            created_at          TIMESTAMP DEFAULT current_timestamp                            NOT NULL
         );
         
         -- trigger for audit table 

@@ -1,15 +1,14 @@
 from datetime import datetime
 
-from ..models import BaseModel
+from src.models import BaseModel
 
 
-class IdempotencyKeys(BaseModel):
-    id: int
+class IdempotencyKey(BaseModel):
+    id: int | None
     idempotency_key: str
     request_path: str
-    request_params: dict
+    request_body: dict
     response_body: dict | None
     response_code: int | None
-    receipt_id: int
-    created_at: datetime
+    created_at: datetime | None
     

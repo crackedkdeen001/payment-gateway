@@ -1,119 +1,80 @@
+import json
 from datetime import datetime
 
 import psycopg
-from psycopg._enums import IsolationLevel
-from fastapi import HTTPException
-from starlette import status
-from starlette.middleware.base import BaseHTTPMiddleware, DispatchFunction, RequestResponseEndpoint
-from starlette.requests import Request
-from starlette.responses import Response
+from fastapi import HTTPException, Request,status
+from fastapi.responses import Response, JSONResponse
+from starlette.concurrency import iterate_in_threadpool
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.responses import JSONResponse
 from starlette.types import ASGIApp
 
-from core import toJsonb
 from src.models import IdempotencyKey
-from src.dependencies import Conn
-from src.core import logger, settings
+from src.core import logger
+from src.db.setup import get_conn_string
 from src.exceptions import ErrorMessages
-from repository.idempotency import IdempotencyRepository
+from src.repository.idempotency import IdempotencyRepository
 
-"""
-Checks if a request has been seen before using the idempotency key provided
-If it has, it should return the response stored in the postgres database.
-If it hasn't, then it should forward the request to the appropriate route function to handle it.
-The middleware should also only work with particular endpoints that require idempotency
 
-edge cases:
-no idempotency header is seen
-If the same idempotency key is used on the same path but with different request parameters, we return a conflict error
-saying that the idempotency key has been used before.
-the request sent is currently in progress 
-"""
+# dependency can't be passed to the middleware, so doing random bs
+conn = psycopg.connect(get_conn_string()) 
 
-def atomic_phase(conn: Conn, idempotency_key: IdempotencyKey | None, callback):
-    conn.isolation_level = IsolationLevel.SERIALIZABLE
-    error = False
-    repository = IdempotencyRepository(conn)
-
-    try:
-        with Conn.transaction():
-            ret = callback()
-
-            if isinstance(ret, (NoOp, RecoveryPoint, Response)):
-                ret.call(key)
-            else:
-                raise Exception
-    except psycopg.errors.SerializationFailure:
-        error = True
-        raise HTTPException(status.HTTP_409_CONFLICT, ErrorMessages.)
-    except Exception:
-        error = True
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, ErrorMessages.)
-    finally:
-        if error and idempotency_key is not None:
-            try:
-                
-        
-
-class IdempotencyMiddleWare(BaseHTTPMiddleware):
-    def __init__(self, app: ASGIApp, conn= Conn):
+class IdempotencyMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app: ASGIApp):
         super().__init__(app)
-        self.header = "X-Idempotency-Key" 
-        self.conn = conn
-        self.repository = IdempotencyRepository(self.conn)
-        self.allowed_methods = ["POST", "PATCH"]
-        
-        self.conn.isolation_level = IsolationLevel.SERIALIZABLE
-        
-    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
-        if request.method in self.allowed_methods:
-            idempotency_key_val = request.headers.get(self.header)
-            # if no key is provided, raise an exception
-            if idempotency_key_val is None:
-                raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=ErrorMessages.IDEMPOTENCY_KEY_NOT_FOUND)
-            else:
-                key = self.repository.get(idempotency_key_val, request.url.path)
-                if key is not None:
-                   # if the idempotency_keys are the same but the request parameters are different,
-                   # we assume it's an invalid request and raise an exception 
-                   if key.request_params != request.path_params:
-                       raise HTTPException(status.HTTP_409_CONFLICT, detail=ErrorMessages.DIFFERENT_PARAMS_WITH_SAME_IDEMPOTENCY_KEY)
-                   
-                   # if the same request is sent while it's still being processed
-                   # we raise an exception
-                   request_start_time = datetime.now() - settings.IDEMPOTENCY_KEY_LOCK_TIMEOUT
-                   if key.locked_at and key.locked_at > request_start_time:
-                       err_message = ErrorMessages.REQUEST_IN_PROGRESS + f" {request_start_time.microsecond}"
-                       raise HTTPException(status.HTTP_409_CONFLICT, detail=err_message)
+        self.idempotency_header = "X-Idempotency-Key"
+        self.idempotency_store = IdempotencyRepository(conn) 
+   
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response | None:
+        request_body = await request.json()
+        if request.method in ["POST", "PATCH"]: 
+            idempotency_key = request.headers.get(self.idempotency_header)
+            
+            if idempotency_key is not None:
+                logger.info("Attempting to get cached response")
+                existing = self.idempotency_store.get(idempotency_key, request.url.path)
                 
-                   
-                else:
-                   # create a new idempotency record if the has not been seen before
-                   key = IdempotencyKey(
-                        id = None,
-                        idempotency_key=idempotency_key_val,
-                        request_path=request.url.path,
-                        request_params=toJsonb(request.path_params),
-                        response_body=None,
-                        response_code=None,
-                        recovery_point=,
-                        locked_at=datetime.now(),
-                        expires_at=settings.IDEMPOTENCY_KEY_EXPIRY_TIME,
-                        created_at=datetime.now()
-                   )
-                   self.repository.create(key)
+                if existing is not None:
+                    if existing.request_body != request_body:
+                        raise HTTPException(status.HTTP_409_CONFLICT, detail=ErrorMessages.DIFFERENT_PARAMS_WITH_SAME_IDEMPOTENCY_KEY)
+                    
+                    # return cached response if everything is in order
+                    logger.info("Returning cached response from idempotency table")
+                    return JSONResponse(content=existing.response_body, headers={"X-Idempotent-Replayed": "true"})
+                # else:
+                #     logger.warn("Idempotency record not found, creating a new one")
+                #     # create a new idempotency record if the has not been seen before
+                #     new_record = IdempotencyKey(
+                #         id = None,
+                #         idempotency_key=idempotency_key,
+                #         request_path=request.url.path,
+                #         request_body=request_body,
+                #         response_body=None,
+                #         response_code=None,
+                #         created_at=datetime.now()
+                #     )
+                #     idempotency_store.create(new_record)
              
-
-class NoOp:
-    def __init__(self):
-        pass
-    
-class RecoveryPoint:
-    def __init__(self, name: str):
-        self.name = name
+            response = await call_next(request) 
+            if should_cache_response(response.status_code):
+                # store response in database if the request was successful
+                json_response_body = [section async for section in response.body_iterator]
+                response_body_dict = json.loads(json_response_body[0])
+                logger.info(f"response_body={json_response_body[0].decode()}")
+                new_record = IdempotencyKey(
+                    id = None,
+                    idempotency_key=idempotency_key,
+                    request_path=request.url.path,
+                    request_body=request_body,
+                    response_body=response_body_dict,
+                    response_code=response.status_code,
+                    created_at=datetime.now()
+                )
+                self.idempotency_store.create(new_record)
+                
+                return response
         
-    def call(self, key: IdempotencyKey):
-        key.recovery_point = self.name
+        return await call_next(request)
         
-
-class CustomResponse(Response):
-    def call
+def should_cache_response(status_code: int) -> bool:
+    return 200 <= status_code < 300

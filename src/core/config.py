@@ -1,21 +1,19 @@
-from pathlib import Path
+import os
+from datetime import timedelta, datetime
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# dynamically sets the file path depending on whether the 
-# .env file is read from tests or used normally
-base_dir_name = Path.cwd().name
-if base_dir_name == "tests":
-    env_args = {
-    "env_file" : str(Path.cwd().parent / ".env")
-    }
-else:
-    env_args = {
-        "env_file" : ".env",
-        "env_file_depth" : 3
-    }
-    
+DOTENV = os.path.join(os.path.dirname(__file__), ".env")
+
 class Config(BaseSettings):
-    model_config = SettingsConfigDict(**env_args)
+    model_config = SettingsConfigDict(env_file=DOTENV)
     
-    database_url: str
+    POSTGRES_USER: str
+    POSTGRES_PASSWORD: str
+    POSTGRES_DB: str
+    POSTGRES_HOST: str
+    POSTGRES_PORT: int
+    POSTGRES_URL: str
+    
+    
+settings = Config()
