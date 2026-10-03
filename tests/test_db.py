@@ -91,9 +91,10 @@ class TestReceipt:
     
     def test_bank_reference_timestamp_trigger(self, receipt_cur):
         insert_query = """
-        INSERT INTO receipts (order_id, customer_id, amount_in_cents, currency, card_number, card_cvv, card_expiry_month, card_expiry_year, current_state)
-        VALUES ('ef51aa3f-620c-4783-8701-8e37a225538e'::uuid, 1, 20, 'usd', '121233', '343', 12, 2001, 'authorized'),
-        ('f726ad17-2928-40e2-8ce8-16cda358bc15'::uuid, 1, 20, 'usd', '121233', '343', 12, 2001, 'captured'),
+        INSERT INTO receipts (order_id, customer_id, amount_in_cents, currency, card_number, card_cvv, card_expiry_month, card_expiry_year, current_state, created_at, authorize_id, authorized_at, capture_id, captured_at, void_id, voided_at, refund_id, refunded_at) 
+        VALUES
+        ('ef51aa3f-620c-4783-8701-8e37a225538e'::uuid, 1, 20, 'usd', '121233', '343', 12, 2001, 'authorized', default, 'auth_b3232323232323', %s, NULL, NULL, NULL, NULL, NULL, NULL),
+        ('f726ad17-2928-40e2-8ce8-16cda358bc15'::uuid, 1, 20, 'usd', '121233', '343', 12, 2001, 'captured', default, NULL, NULL, , NULL, NULL, NULL, NULL, NULL),
         ('17aeea5d-54ca-48d9-b9a5-4e29dc35cb33'::uuid, 1, 20, 'usd', '121233', '343', 12, 2001, 'refunded'),
         ('39635382-a7c0-4b85-8c94-3a6a67196239'::uuid, 1, 20, 'usd', '121233', '343', 12, 2001, 'voided')
         RETURNING *;
@@ -185,7 +186,7 @@ class TestIdempotency:
 
     def test_create_idempotency_row(self,receipt, idem_cur):
         insert_query = """
-        INSERT INTO idempotency_keys (idempotency_key, request_path, request_params, response_body, response_code, receipt_id) 
+        INSERT INTO idempotency_keys (idempotency_key, request_path, request_body, response_body, response_code, receipt_id) 
         VALUES ('678923232323', '/api/v3/google', (%s), NULL, NULL, 1) 
         RETURNING *;
         """
@@ -200,7 +201,7 @@ class TestIdempotency:
     def test_not_null_constraint(self, receipt, idem_cur):
         with pytest.raises(psycopg.IntegrityError):
             insert_query = """
-            INSERT INTO idempotency_keys (idempotency_key, request_path, request_params, response_body, response_code, receipt_id)
+            INSERT INTO idempotency_keys (idempotency_key, request_path, request_body, response_body, response_code, receipt_id)
             VALUES ('678923232323', NULL , (%s), NULL, NULL, 1)
             RETURNING *; 
             """

@@ -123,7 +123,7 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
+src/core/.env
 .venv
 env/
 venv/
@@ -190,9 +190,10 @@ Thumbs.db
 *.pem
 credentials.json
 
-# Claude
-CLAUDE.md
 payment-gateway-specification.txt
-
+database.txt
+init.sh
+TRADEOFFS.MD
+post.data
 
 

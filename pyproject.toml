@@ -3,7 +3,6 @@ name = "paymentgateway"
 version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = [
-    "alembic>=1.20.0",
     "fastapi>=0.138.0",
     "psycopg[binary,pool]>=3.3.4",
     "pydantic>=2.13.4",

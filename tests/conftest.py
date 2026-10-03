@@ -1,7 +1,9 @@
 import pytest
 from psycopg import Connection
+from psycopg.rows import class_row
 
-from src.db.row_factories import ReceiptRowFactory, IdempotencyRowFactory
+from src.models import IdempotencyKey, Receipt
+from src.db.row_factories import ReceiptRowFactory
 
 
 # TODO Find a way to deduplicate this DDL copied from the alembic folder
@@ -73,7 +75,7 @@ def build_schema(postgresql: Connection):
             idempotency_key VARCHAR(100) NOT NULL,
 
             request_path VARCHAR(100) NOT NULL,
-            request_params JSONB NOT NULL,
+            request_body JSONB NOT NULL,
 
             response_body JSONB,
             response_code INTEGER,
@@ -149,7 +151,7 @@ def receipt_cur(build_schema, postgresql:Connection):
         
 @pytest.fixture()
 def idem_cur(build_schema, postgresql: Connection):
-    with postgresql.cursor(row_factory=IdempotencyRowFactory) as cur:
+    with postgresql.cursor(row_factory=class_row(IdempotencyKey)) as cur:
         yield cur
 
 @pytest.fixture()
