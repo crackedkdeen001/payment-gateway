@@ -11,8 +11,13 @@ class CustomBaseException(Exception):
         self.status_code = status_code
         
     def content(self):
-        return {"error":self.message}
+        return {"status":"error", "detail":self.message}
         
 class IdempotencyException(CustomBaseException):
     def __init__(self, message: str, status_code: int):
         super().__init__(message, status_code)
+
+class EmptyRequestBodyError(CustomBaseException):
+    def __init__(self, message: str, status_code: int):
+        super().__init__(message, status_code)
+        

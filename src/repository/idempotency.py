@@ -3,14 +3,7 @@ from psycopg.rows import class_row
 from src.models import IdempotencyKey
 from src.core import toJsonb
 from psycopg import Connection, sql
-from src.db.setup import Conn
 
-"""
-methods
-
-create an idempotent record
-get a cached record using the idempotency key
-"""
 
 class IdempotencyRepository:
     def __init__(self, connection: Connection):
@@ -52,7 +45,7 @@ class IdempotencyRepository:
             self._conn.commit()
             return row.fetchone()
         
-    def update(self,key: IdempotencyKey, **params):
+    def update(self,key: IdempotencyKey, **params)-> IdempotencyKey | None:
         with self._conn.cursor() as cursor:
             values = []
             set_clause = []
@@ -70,22 +63,22 @@ class IdempotencyRepository:
                     )
                 )
                 
-                # interpolate the values
-                query = sql.SQL(
-                    """
-                    UPDATE idempotency_keys
-                    SET {}
-                    WHERE id = {}
-                    RETURNING *;
-                    """
-                ).format(
-                    sql.SQL(", ").join(set_clause),
-                    sql.Literal(key.id)
-                )
+            # interpolate the values
+            query = sql.SQL(
+                """
+                UPDATE idempotency_keys
+                SET {}
+                WHERE id = {}
+                RETURNING *;
+                """
+            ).format(
+                sql.SQL(", ").join(set_clause),
+                sql.Literal(key.id)
+            )
                 
-                updated_key = cursor.execute(query, values).fetchone()
-                self._conn.commit()
-                return updated_key
+            updated_key = cursor.execute(query, values).fetchone()
+            self._conn.commit()
+            return updated_key
                
                     
             
