@@ -1,11 +1,10 @@
 import uvicorn
 from fastapi import Depends, FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from src.exceptions import INTERNAL_SERVER_ERROR
 from src.middleware.idempotency import IdempotencyMiddleware
 from src.dependencies import idempotency_header
-from src.exceptions import CustomBaseException
 from src.models import Card
 
 app = FastAPI(dependencies=[Depends(idempotency_header)])
@@ -15,14 +14,16 @@ app.add_middleware(
 )
 
 
-@app.exception_handler(Exception)
-def http_exception_handler(request: Request, exc:Exception):
-    if isinstance(exc, CustomBaseException):
-        return JSONResponse(content=exc.content(), status_code=exc.status_code)
-    return JSONResponse(content={"error":INTERNAL_SERVER_ERROR}, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+@app.exception_handler(RequestValidationError)
+def request_validation_exception_handler(request: Request, exc: RequestValidationError):
+    message = ""
+    for error in exc.errors():
+        message += f"Field: {error['loc']}, Error: {error['msg']}"
+        
+    return JSONResponse(content={"status":"error", "message":message}, status_code=status.HTTP_400_BAD_REQUEST)
 
 @app.post("/authorize")
-def authorize(card: Card):
+async def authorize(card: Card):
     return card
 
 if __name__ == "__main__":

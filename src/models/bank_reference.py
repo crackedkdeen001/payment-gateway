@@ -5,6 +5,7 @@ from src.models import BaseModel
 class BankReference(BaseModel):
     authorize_id: str | None 
     authorized_at: datetime | None
+    auth_expiry : datetime | None
     capture_id: str | None
     captured_at: datetime | None
     void_id: str | None

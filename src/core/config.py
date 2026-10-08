@@ -15,6 +15,11 @@ class Config(BaseSettings):
     POSTGRES_PORT: int
     POSTGRES_URL: str
     
-    IDEMPOTENCY_KEY_LENGTH: int = 100
+    TEST_POSTGRES_USER: str
+    TEST_POSTGRES_PASSWORD: str
+    TEST_POSTGRES_DB: str
+    TEST_POSTGRES_HOST: str
+    TEST_POSTGRES_PORT: int
     
+    IDEMPOTENCY_KEY_LENGTH: int = 100
 settings = Config()
