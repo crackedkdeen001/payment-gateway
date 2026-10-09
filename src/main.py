@@ -1,5 +1,5 @@
 import uvicorn
-from fastapi import Depends, FastAPI, Request, status
+from fastapi import Depends, FastAPI, Request, status, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
@@ -21,6 +21,10 @@ def request_validation_exception_handler(request: Request, exc: RequestValidatio
         message += f"Field: {error['loc']}, Error: {error['msg']}"
         
     return JSONResponse(content={"status":"error", "message":message}, status_code=status.HTTP_400_BAD_REQUEST)
+
+@app.exception_handler(HTTPException)
+def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(content={"status":"error", "message":exc.detail}, status_code=exc.status_code)
 
 @app.post("/authorize")
 async def authorize(card: Card):

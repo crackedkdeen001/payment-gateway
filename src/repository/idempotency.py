@@ -31,7 +31,6 @@ class IdempotencyRepository:
             """, 
             params=params
             )
-            self._conn.commit()
 
     def get(self, idempotency_key: str, request_path) -> IdempotencyKey | None:
         with self._conn.cursor() as cursor:
@@ -42,7 +41,6 @@ class IdempotencyRepository:
             """,
             params=(idempotency_key, request_path))
             
-            self._conn.commit()
             return row.fetchone()
         
     def update(self,key: IdempotencyKey, **params)-> IdempotencyKey | None:
@@ -77,7 +75,6 @@ class IdempotencyRepository:
             )
                 
             updated_key = cursor.execute(query, values).fetchone()
-            self._conn.commit()
             return updated_key
                
                     

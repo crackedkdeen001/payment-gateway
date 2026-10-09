@@ -13,10 +13,14 @@ test_postgresql_proc = factories.postgresql_proc(
 test_postgresql = factories.postgresql("test_postgresql_proc")
 
 @pytest.fixture(name="data")
-def card_data():
+def card_data()-> dict[str, str | int]:
     return  {
     "number": "23923",
     "cvv": "231",
     "expiry_month": 12,
     "expiry_year":2028
 }
+
+@pytest.fixture(name="idempotency_header")
+def idempotency_header() -> dict[str, str]:
+    return {"X-Idempotency-Key":"28323232323"}
