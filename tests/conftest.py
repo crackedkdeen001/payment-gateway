@@ -13,12 +13,28 @@ test_postgresql_proc = factories.postgresql_proc(
 test_postgresql = factories.postgresql("test_postgresql_proc")
 
 @pytest.fixture(name="data")
-def card_data()-> dict[str, str | int]:
+def receipt_data()-> dict[str, str | int]:
     return  {
-    "number": "23923",
-    "cvv": "231",
-    "expiry_month": 12,
-    "expiry_year":2028
+        "id": 0,
+        "void_id": "string",
+        "card_cvv": "string",
+        "currency": "string",
+        "order_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        "refund_id": "string",
+        "voided_at": "2026-10-10T15:22:09.215000+00:00",
+        "capture_id": "string",
+        "created_at": "2026-10-10T15:22:09.215000+00:00",
+        "auth_expiry": "2026-10-10T15:22:09.215000+00:00",
+        "captured_at": "2026-10-10T15:22:09.215000+00:00",
+        "card_number": "string",
+        "customer_id": 0,
+        "refunded_at": "2026-10-10T15:22:09.215000+00:00",
+        "authorize_id": "string",
+        "authorized_at": "2026-10-10T15:22:09.215000+00:00",
+        "current_state": "pending",
+        "amount_in_cents": 0,
+        "card_expiry_year": 0,
+        "card_expiry_month": 0
 }
 
 @pytest.fixture(name="idempotency_header")

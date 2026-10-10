@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 
 from src.middleware.idempotency import IdempotencyMiddleware
 from src.dependencies import idempotency_header
-from src.models import Card
+from src.models import Receipt
 
 app = FastAPI(dependencies=[Depends(idempotency_header)])
 
@@ -27,8 +27,8 @@ def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(content={"status":"error", "message":exc.detail}, status_code=exc.status_code)
 
 @app.post("/authorize")
-async def authorize(card: Card):
-    return card
+async def authorize(receipt: Receipt):
+    return receipt.model_dump(exclude_none=True)
 
 if __name__ == "__main__":
     uvicorn.run("src.main:app", reload=True)

@@ -12,16 +12,13 @@ class IdempotencyRepository:
         self.columns = IdempotencyKey.model_fields.keys()
         
 
-    def create(self, record: IdempotencyKey):
+    def create(self, idempotency_record: IdempotencyKey):
         with self._conn.cursor() as cursor:
-            params = record.model_dump()
+            fields = idempotency_record.model_dump(exclude={"id", "created_at"})
             
-            # delete useless parameters
-            del params["id"]
-            del params["created_at"]
-            
-            params["request_body"] = toJsonb(params["request_body"])
-            params["response_body"] = toJsonb(params["response_body"])
+            # delete fields that are made at db level
+            fields["request_body"] = toJsonb(fields["request_body"])
+            fields["response_body"] = toJsonb(fields["response_body"])
 
             row = cursor.execute(
             """
@@ -29,7 +26,7 @@ class IdempotencyRepository:
             VALUES (%(idempotency_key)s, %(request_path)s, %(request_body)s, %(response_body)s, %(response_code)s)
             RETURNING *;
             """, 
-            params=params
+            params=fields
             )
 
     def get(self, idempotency_key: str, request_path) -> IdempotencyKey | None:

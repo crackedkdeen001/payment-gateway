@@ -36,14 +36,9 @@ def test_same_idempotency_key_with_different_request_parameters_returns_an_error
     
     assert valid_response.status_code == status.HTTP_200_OK
     
-    diff_req_params = {
-        "number": "292929", # card number is different
-        "cvv": "231",
-        "expiry_month": "12",
-        "expiry_year": "2028"
-    }
+    data["amount_in_cents"] = 400
     
-    invalid_response = client.post("/authorize", json=diff_req_params, headers=idempotency_header)
+    invalid_response = client.post("/authorize", json=data, headers=idempotency_header)
     
     assert invalid_response.status_code == status.HTTP_409_CONFLICT
     assert invalid_response.json() == {"status":"error", "message":DIFFERENT_PARAMS_WITH_SAME_IDEMPOTENCY_KEY}

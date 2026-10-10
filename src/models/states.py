@@ -1,7 +1,6 @@
 from datetime import datetime
 from enum import StrEnum
 
-from .card import Card
 from src.models import BaseModel
 
 
@@ -18,8 +17,10 @@ class PaymentStates(StrEnum):
 class GenericPayment(BaseModel):
     receipt_id: str
     order_id: str
-    card: Card
-
+    card_number: str
+    card_cvv: str
+    card_expiry_month: int
+    card_expiry_year: int
 
 class PendingPayment(GenericPayment):
     pass

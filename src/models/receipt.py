@@ -3,18 +3,27 @@ from uuid import UUID
 
 from src.models import BaseModel
 
-from .card import Card
 from .states import PaymentStates
-from .bank_reference import BankReference
 
 
 class Receipt(BaseModel):
-    id: int
+    id: int | None
     order_id: UUID
     customer_id: int
     amount_in_cents: int
     currency: str
-    card: Card
+    card_number: str
+    card_cvv: str
+    card_expiry_month: int
+    card_expiry_year: int
     current_state: PaymentStates
-    bank_reference: BankReference
+    authorize_id: str | None
+    authorized_at: datetime | None
+    auth_expiry : datetime | None
+    capture_id: str | None
+    captured_at: datetime | None
+    void_id: str | None
+    voided_at: datetime | None
+    refund_id: str | None
+    refunded_at: datetime | None
     created_at: datetime
