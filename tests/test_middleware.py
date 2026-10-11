@@ -28,7 +28,7 @@ def test_same_request_with_same_idempotency_key_returns_an_idempotent_response_o
 def test_no_idempotency_key_in_request_returns_an_error(test_postgresql, data):
     response = client.post("/authorize", json=data)
     
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.json()["message"] ==  "Field: ('header', 'X-Idempotency-Key'), Error: Field required"
     
 def test_same_idempotency_key_with_different_request_parameters_returns_an_error(test_postgresql, data, idempotency_header):

@@ -1,15 +1,17 @@
 from psycopg.rows import class_row
 
+from src.repository.generic_repository import GenericRepository
 from src.models import IdempotencyKey
 from src.core import toJsonb
 from psycopg import Connection, sql
 
 
-class IdempotencyRepository:
+class IdempotencyRepository(GenericRepository):
     def __init__(self, connection: Connection):
-        self._conn = connection
+        super().__init__(connection)
         self._conn.row_factory = class_row(IdempotencyKey)
         self.columns = IdempotencyKey.model_fields.keys()
+        self.table_name = "idempotency_keys"
         
 
     def create(self, idempotency_record: IdempotencyKey):
@@ -40,39 +42,8 @@ class IdempotencyRepository:
             
             return row.fetchone()
         
-    def update(self,key: IdempotencyKey, **params)-> IdempotencyKey | None:
-        with self._conn.cursor() as cursor:
-            values = []
-            set_clause = []
-            
-            # get valid fields for updating
-            for field, value in params.items():
-                if field in self.columns:
-                    values.append(value)
-                
-                # build the SET statement dynamically
-                set_clause.append(
-                    sql.SQL("{} = {}").format(
-                        sql.Identifier(field),
-                        sql.Placeholder()
-                    )
-                )
-                
-            # interpolate the values
-            query = sql.SQL(
-                """
-                UPDATE idempotency_keys
-                SET {}
-                WHERE id = {}
-                RETURNING *;
-                """
-            ).format(
-                sql.SQL(", ").join(set_clause),
-                sql.Literal(key.id)
-            )
-                
-            updated_key = cursor.execute(query, values).fetchone()
-            return updated_key
+    def update(self, model: IdempotencyKey, **params)-> IdempotencyKey | None:
+        super().update(model, **params)
                
                     
             
