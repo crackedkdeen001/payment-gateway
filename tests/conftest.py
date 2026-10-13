@@ -8,14 +8,14 @@ from pytest_postgresql import factories
 from src.models import PaymentStates
 from src.models import Receipt
 
-path_to_sql = Path("payment-gateway/src/db/schema/schema.sql", )
+schema_file = Path.cwd().parent / Path("src/db/schema/schema.sql")
 
 # Make the test database be populated with the schema per test session run.
 test_postgresql_proc = factories.postgresql_proc(
-    load=[path_to_sql]
+    load=[schema_file]
 )
 
-test_postgresql = factories.postgresql("test_postgresq`l_proc")
+test_database = factories.postgresql("test_postgresql_proc")
 
 @pytest.fixture(name="data")
 def receipt_data()-> dict[str, str | int]:
@@ -43,7 +43,7 @@ def receipt_data()-> dict[str, str | int]:
 }
 
 
-@pytest.fixture(name="receipt")
+@pytest.fixture(name="test_receipt")
 def receipt_instance() -> Receipt:
     return Receipt(
         id= None,

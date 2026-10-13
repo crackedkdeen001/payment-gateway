@@ -35,9 +35,11 @@ class GenericRepository:
                 RETURNING *;
                 """
             ).format(sql.Identifier(self.table_name),
-           sql.SQL(", ").join(set_clause),
-                 sql.Literal(model.id)
+            sql.SQL(", ").join(set_clause),
+            sql.Literal(model.id)
             )
 
             updated_key = cursor.execute(query, values).fetchone()
+            self._conn.commit()
+            
             return updated_key

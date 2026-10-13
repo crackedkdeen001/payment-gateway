@@ -3,13 +3,13 @@ from psycopg.rows import class_row
 from src.repository.generic_repository import GenericRepository
 from src.models import IdempotencyKey
 from src.core import toJsonb
-from psycopg import Connection, sql
+from psycopg import Connection
 
 
 class IdempotencyRepository(GenericRepository):
     def __init__(self, connection: Connection):
         super().__init__(connection)
-        self._conn.row_factory = class_row(IdempotencyKey)
+        self._conn.row_factory = class_row(IdempotencyKey)  
         self.columns = IdempotencyKey.model_fields.keys()
         self.table_name = "idempotency_keys"
         
@@ -30,6 +30,8 @@ class IdempotencyRepository(GenericRepository):
             """, 
             params=fields
             )
+            self._conn.commit()
+            return row.fetchone
 
     def get(self, idempotency_key: str, request_path) -> IdempotencyKey | None:
         with self._conn.cursor() as cursor:
@@ -39,7 +41,8 @@ class IdempotencyRepository(GenericRepository):
             WHERE idempotency_key = %s AND request_path = %s;
             """,
             params=(idempotency_key, request_path))
-            
+
+            self._conn.commit()
             return row.fetchone()
         
     def update(self, model: IdempotencyKey, **params)-> IdempotencyKey | None:

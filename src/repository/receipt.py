@@ -17,7 +17,6 @@ class ReceiptRepository(GenericRepository):
     def create(self, receipt: Receipt):
         with self._conn.cursor() as  cursor:
             fields = receipt.model_dump(exclude={"id", "created_at"}) 
-            
             query = """
             INSERT INTO receipts 
             (order_id, customer_id, amount_in_cents, currency,
@@ -29,11 +28,15 @@ class ReceiptRepository(GenericRepository):
                     %(current_state)s, %(authorize_id)s, %(authorized_at)s, %(auth_expiry)s,
                     %(capture_id)s, %(captured_at)s, %(void_id)s, %(voided_at)s,
                     %(refund_id)s, %(refunded_at)s)
-           """
-            cursor.execute(query, params=fields)
+            RETURNING *;
+            """ 
+            receipt = cursor.execute(query, params=fields)
+            self._conn.commit()
+            
+            return receipt.fetchone()
             
     def update(self, model: Receipt, **params) -> Receipt | None:
-        super().update(model, **params)
+        return super().update(model, **params)
     
     def get_by_id(self, receipt_id: int) -> Receipt | None:
         return self._get_by(field_name="id", field_value=receipt_id)
@@ -44,8 +47,10 @@ class ReceiptRepository(GenericRepository):
     def get_by_order_id(self, order_id: UUID) -> Receipt | None:
         return self._get_by(field_name="order_id", field_value=order_id)
 
-    def _get_by(self, field_name, field_value):
+    def _get_by(self, field_name, field_value) -> Receipt | None:
         with self._conn.cursor() as cursor:
-            query = sql.SQL(" SELECT FROM receipts WHERE {0} = {1}").format(sql.Identifier(field_name), sql.Literal(field_value))
-            row = cursor.execute(query).fetchone()
-            return row
+            query = sql.SQL("SELECT * FROM receipts WHERE {0} = {1}").format(sql.Identifier(field_name), sql.Literal(field_value))
+            
+            receipt = cursor.execute(query).fetchone()
+            self._conn.commit()
+            return receipt
