@@ -1,14 +1,14 @@
 CREATE TYPE payment_states as ENUM ('pending','authorized', 'captured', 'voided', 'refunded');
 CREATE TABLE receipts (
     id                  SERIAL PRIMARY KEY,                                                        
-    order_id            UUID                                                           NOT NULL,
+    order_id            UUID UNIQUE                                                    NOT NULL,
     customer_id         INT                                                            NOT NULL,
     amount_in_cents     INT                                                            NOT NULL,
     currency            VARCHAR(3)                                                     NOT NULL,
     card_number         VARCHAR(100)                                                   NOT NULL,
     card_cvv            VARCHAR(3)                                                     NOT NULL,
     card_expiry_month   INT CHECK (card_expiry_month >= 1 AND card_expiry_month <= 12) NOT NULL,
-    card_expiry_year    INT CHECK (card_expiry_year >= 1800)                              NOT NULL,
+    card_expiry_year    INT CHECK (card_expiry_year >= 1800)                           NOT NULL,
     current_state       payment_states DEFAULT 'pending'                               NOT NULL,
     authorize_id        VARCHAR(100),
     authorized_at       TIMESTAMP,

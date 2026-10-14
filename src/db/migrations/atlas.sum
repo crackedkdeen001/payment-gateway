@@ -1,3 +1,4 @@
-h1:GejGPRQwkm7qaQtllaGvNZt5O+yQBzGQmyHeACmVw5k=
+h1:O3mtqq0Vtq9tm71yfm4eTJraSqJjPH55YJTj5PCqwJU=
 20261003080052_init-database.sql h1:g7M6ozP001sRDCL0EYtiVEySrV2EVU1zXNlQ0auPAGA=
 20261010201653_change expiry year to 1800.sql h1:jnck7UnBATIG5xApXPc4Mzo9ZGZmJTNY8wSGYvQtUgU=
+20261014131232_make order_id unique across receipts.sql h1:RtfyYTySEkEL6zBZvWdBmUYwpItgcBme2vvd0+C0UgA=
