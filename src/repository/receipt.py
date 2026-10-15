@@ -31,7 +31,7 @@ class ReceiptRepository(GenericRepository):
             RETURNING *;
             """ 
             receipt = cursor.execute(query, params=fields)
-            self._conn.commit()
+            # self._conn.commit()
             
             return receipt.fetchone()
             
@@ -52,5 +52,5 @@ class ReceiptRepository(GenericRepository):
             query = sql.SQL("SELECT * FROM receipts WHERE {0} = {1}").format(sql.Identifier(field_name), sql.Literal(field_value))
             
             receipt = cursor.execute(query).fetchone()
-            self._conn.commit()
+            # self._conn.commit()
             return receipt

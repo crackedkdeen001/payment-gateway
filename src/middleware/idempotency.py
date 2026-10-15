@@ -7,41 +7,41 @@ from fastapi.responses import Response, JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.types import ASGIApp
 
+from src.middleware.helpers import get_request_body
 from src.db import get_conn_string
 from src.models import IdempotencyKey
 from src.core import logger
-from src.exceptions import DIFFERENT_PARAMS_WITH_SAME_IDEMPOTENCY_KEY, EMPTY_REQUEST_BODY
+from src.exceptions import DIFFERENT_PARAMS_WITH_SAME_IDEMPOTENCY_KEY 
 from src.repository.idempotency import IdempotencyRepository
 
 class IdempotencyMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp):
         super().__init__(app)
         self.idempotency_header = "X-Idempotency-Key"
-        self.idempotency_store = None
+        self.idempotency_repo = None
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> JSONResponse | Response:
         with psycopg.connect(get_conn_string()) as conn:
             with conn.transaction():
-                self.idempotency_store = IdempotencyRepository(conn)
+                self.idempotency_repo = IdempotencyRepository(conn)
                 
                 if request.method not in ["POST", "PATCH"]:
                     return await call_next(request)
                 
-                bytes_request_body = await request.body()
-                # raise an error if request_body is empty
-                if not bytes_request_body:
-                    return JSONResponse(content={"status":"error", "message": EMPTY_REQUEST_BODY}, status_code=status.HTTP_400_BAD_REQUEST)
-                json_request_body = json.loads(bytes_request_body)
+                request_body = await get_request_body(request)
+                # if the request body is empty, return an error
+                if isinstance(request, JSONResponse):
+                    return request_body
                 
                 idempotency_key = request.headers.get(self.idempotency_header)
                 if idempotency_key is not None:
                     logger.info("Attempting to get cached response")
-                    existing = self.idempotency_store.get(idempotency_key, request.url.path)
+                    existing = self.idempotency_repo.get(idempotency_key, request.url.path)
                     
                     # using an idempotency key with the different request bodies
                     # yields an error.
                     if existing is not None:
-                        if existing.request_body != json_request_body:
+                        if existing.request_body != request_body:
                             return JSONResponse(content={"status":"error", "message": DIFFERENT_PARAMS_WITH_SAME_IDEMPOTENCY_KEY}, status_code=status.HTTP_409_CONFLICT)
 
                         # return cached response if everything is in order
@@ -60,14 +60,14 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         id = None,
                         idempotency_key=idempotency_key,
                         request_path=request.url.path,
-                        request_body=json_request_body,
+                        request_body=request_body,
                         response_body=response_body_dict,
                         response_code=response.status_code,
                         created_at=datetime.now()
                     )
-                    self.idempotency_store.create(new_record)
+                    self.idempotency_repo.create(new_record)
                     
-                    return JSONResponse(content=json_request_body, status_code=status.HTTP_200_OK)
+                    return JSONResponse(content=request_body, status_code=status.HTTP_200_OK)
                 else:
                     return response
         

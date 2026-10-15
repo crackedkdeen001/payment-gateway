@@ -26,4 +26,4 @@ class Receipt(BaseModel):
     voided_at: datetime | None
     refund_id: str | None
     refunded_at: datetime | None
-    created_at: datetime
+    created_at: datetime | None

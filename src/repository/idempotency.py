@@ -30,7 +30,7 @@ class IdempotencyRepository(GenericRepository):
             """, 
             params=fields
             )
-            self._conn.commit()
+            # self._conn.commit()
             return row.fetchone
 
     def get(self, idempotency_key: str, request_path) -> IdempotencyKey | None:
@@ -42,7 +42,7 @@ class IdempotencyRepository(GenericRepository):
             """,
             params=(idempotency_key, request_path))
 
-            self._conn.commit()
+            # self._conn.commit()
             return row.fetchone()
         
     def update(self, model: IdempotencyKey, **params)-> IdempotencyKey | None:

@@ -40,6 +40,6 @@ class GenericRepository:
             )
 
             updated_key = cursor.execute(query, values).fetchone()
-            self._conn.commit()
+            # self._conn.commit()
             
             return updated_key
