@@ -21,7 +21,7 @@ def remove_prefix(id: str, prefix:str):
     if not id.startswith(prefix):
         raise ValueError(f"{id} is an invalid ID, it should start with {order_prefix}")
 
-    return id.removeprefix(order_prefix)
+    return id.removeprefix(prefix)
 
 # -- for requests 
 # check if the id sent has the prefix, we return an error if it doesn't.
@@ -41,7 +41,7 @@ def parse_integer_ids(integer_id: str, prefix: str):
     try:
         try_id = int(original_id)
     except ValueError:
-        raise ValueError(f"{integer_id} is an invalid ID, it must be a  with {prefix} at the beginning")
+        raise ValueError(f"{integer_id} is an invalid ID, it must be an number with {prefix} at the beginning")
 
     return original_id
 

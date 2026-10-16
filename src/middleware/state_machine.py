@@ -89,21 +89,3 @@ class StateMachineMiddleware(BaseHTTPMiddleware):
                         return invalid_state_transition_response(state=None)
                     
                 return await call_next(request)
-
-
-def invalid_state_transition_response(state: PaymentStates | None):
-    if not state:
-        return JSONResponse(
-            content={"state": "error", "message": "request can't be processed at this endpoint"},
-            status_code=status.HTTP_400_BAD_REQUEST
-        )
-    
-    endpoints = "".join(valid_endpoints[state])
-    return JSONResponse(
-        content=
-        {
-            "state": "error",
-            "message": f"request can't be processed at this endpoint. Try sending it to {endpoints}"
-        },
-        status_code=status.HTTP_400_BAD_REQUEST
-    )
