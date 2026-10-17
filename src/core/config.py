@@ -22,11 +22,7 @@ class Config(BaseSettings):
     TEST_POSTGRES_HOST: str
     TEST_POSTGRES_PORT: int
     
-    BANK_URL: str
-    BANK_AUTHORIZE_URL: str
-    BANK_CAPTURE_URL: str
-    BANK_VOID_URL: str
-    BANK_REFUND_URL: str
+    BANK_API_URL: str
 
     IDEMPOTENCY_KEY_LENGTH: int = 100
 

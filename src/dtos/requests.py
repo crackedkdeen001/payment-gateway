@@ -26,3 +26,25 @@ class ReceiptAuthorize(BaseModel):
     card_expiry_year: Annotated[int, Field(ge=1800)]
     amount: Annotated[int, Field(ge=1)]
     currency: Annotated[str, Field(max_length=3)]
+    
+class BankAuthorizeRequest(BaseModel):
+    card_number: str
+    cvv: str
+    expiry_month: int
+    expiry_year: int
+    amount: int
+    
+class ActionsAfterAuthorizeRequest(BaseModel):
+    authorization_id: str
+    
+class BankVoidRequest(ActionsAfterAuthorizeRequest):
+    pass
+
+
+class BankCaptureRequest(ActionsAfterAuthorizeRequest):
+    pass
+
+class BankRefundRequest(BaseModel):
+    capture_id: str
+    amount: int
+    

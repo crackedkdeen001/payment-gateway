@@ -1,4 +1,7 @@
+from typing import Annotated
 from uuid import UUID
+
+from pydantic import Field
 
 receipt_prefix = "rex_"
 order_prefix = "orx_"
@@ -52,3 +55,6 @@ def parse_customer_id(id: str) -> str:
 
 def parse_receipt_id(id: str) -> str:
     return parse_integer_ids(id, prefix=receipt_prefix)
+
+
+currency = Annotated[str, Field(min_length=3, max_length=3)]
