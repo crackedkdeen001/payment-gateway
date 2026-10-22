@@ -5,7 +5,7 @@ from fastapi import Header, status
 from fastapi.responses import JSONResponse
 
 from src.exceptions import IDEMPOTENCY_KEY_TOO_LONG
-from  src.core import settings
+from src.core import settings
 
 
 async def idempotency_header(X_Idempotency_Key: Annotated[str, Header()]):

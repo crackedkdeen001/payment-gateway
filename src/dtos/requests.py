@@ -1,9 +1,9 @@
 from typing import Annotated
-from uuid import UUID
 
-from pydantic import BaseModel, Field, BeforeValidator
+from pydantic import BaseModel, Field
 
-from src.dtos.helpers import parse_customer_id, parse_order_id
+from .helpers import OrderID, CustomerID, ReceiptID, PositiveAmount
+
 
 # --- For responses
 
@@ -14,34 +14,44 @@ from src.dtos.helpers import parse_customer_id, parse_order_id
 # if the prefix is "rex_" or "cux_", parse it as an integer, else we parse it as an UUID and return to the sender
 
 
-order_id = Annotated[str, BeforeValidator(parse_order_id)]
-customer_id = Annotated[str, BeforeValidator(parse_customer_id)]
+class GenericReceiptRequest(BaseModel):
+    order_id: OrderID
 
-class ReceiptAuthorize(BaseModel):
-    customer_id: customer_id
-    order_id: order_id
-    card_number: str
+class AuthorizeReceiptRequest(GenericReceiptRequest):
+    customer_id: CustomerID
+    card_number: Annotated[str, Field(min_length=13, max_length=19)]
     card_cvv: Annotated[str, Field(max_length=3)]
     card_expiry_month: Annotated[int, Field(ge=1, le=12)]
     card_expiry_year: Annotated[int, Field(ge=1800)]
-    amount: Annotated[int, Field(ge=1)]
     currency: Annotated[str, Field(max_length=3)]
+    amount: PositiveAmount
+    
+class ParamsForReceiptIDDependentEndpoints(GenericReceiptRequest):
+    receipt_id: ReceiptID
+    
+class CaptureReceiptRequest(ParamsForReceiptIDDependentEndpoints):
+    amount: PositiveAmount
+
+class VoidReceiptRequest(ParamsForReceiptIDDependentEndpoints):
+    pass
+    
+class RefundReceiptRequest(ParamsForReceiptIDDependentEndpoints):
+    amount: PositiveAmount
     
 class BankAuthorizeRequest(BaseModel):
     card_number: str
     cvv: str
     expiry_month: int
     expiry_year: int
-    amount: int
+    amount: PositiveAmount
     
-class ActionsAfterAuthorizeRequest(BaseModel):
+class ParamsForAuthIDDependentEndpoints(BaseModel):
     authorization_id: str
     
-class BankVoidRequest(ActionsAfterAuthorizeRequest):
+class BankVoidRequest(ParamsForAuthIDDependentEndpoints):
     pass
 
-
-class BankCaptureRequest(ActionsAfterAuthorizeRequest):
+class BankCaptureRequest(ParamsForAuthIDDependentEndpoints):
     pass
 
 class BankRefundRequest(BaseModel):

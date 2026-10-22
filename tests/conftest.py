@@ -2,13 +2,17 @@ from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
+import psycopg
 import pytest
 from pytest_postgresql import factories
+
+from db import get_dsn
+from repository import ReceiptRepository
 
 from src.models import PaymentStates
 from src.models import Receipt
 
-schema_file = Path.cwd().parent / Path("src/db/schema/schema.sql")
+schema_file = Path(__file__).resolve().parents[1] / "src/db/schema/schema.sql"
 
 # Make the test database be populated with the schema per test session run.
 test_postgresql_proc = factories.postgresql_proc(
@@ -43,7 +47,7 @@ def receipt_data()-> dict[str, str | int]:
 }
 
 
-@pytest.fixture(name="test_receipt")
+@pytest.fixture(name="mock_receipt")
 def receipt_instance() -> Receipt:
     return Receipt(
         id= None,
@@ -68,6 +72,18 @@ def receipt_instance() -> Receipt:
         created_at=datetime.now()
     )
 
+@pytest.fixture(name="test_receipt")
+def create_test_receipt(mock_receipt, receipt_repo):
+    receipt = receipt_repo.create(mock_receipt)
+    receipt_repo.commit()
+    
+    return receipt
+
 @pytest.fixture(name="idempotency_header")
 def idempotency_header() -> dict[str, str]:
     return {"X-Idempotency-Key":"28323232323"}
+
+
+@pytest.fixture(name="receipt_repo")
+def receipt_repository():
+    return ReceiptRepository(connection=psycopg.connect(get_dsn()))

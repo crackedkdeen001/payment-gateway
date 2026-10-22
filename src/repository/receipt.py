@@ -9,13 +9,13 @@ from src.repository.generic_repository import GenericRepository
 class ReceiptRepository(GenericRepository):
     def __init__(self, connection: Connection):
         super().__init__(connection)
-        self._conn.row_factory = class_row(Receipt)
         self.columns = Receipt.model_fields.keys()
         self.table_name = "receipts"
+        self.class_row = class_row(Receipt)
         
     # create a receipt in the database
     def create(self, receipt: Receipt):
-        with self._conn.cursor() as  cursor:
+        with self._conn.cursor(row_factory=self.class_row) as  cursor:
             fields = receipt.model_dump(exclude={"id", "created_at"}) 
             query = """
             INSERT INTO receipts 
@@ -31,7 +31,6 @@ class ReceiptRepository(GenericRepository):
             RETURNING *;
             """ 
             receipt = cursor.execute(query, params=fields)
-            # self._conn.commit()
             
             return receipt.fetchone()
             
@@ -48,9 +47,8 @@ class ReceiptRepository(GenericRepository):
         return self._get_by(field_name="order_id", field_value=order_id)
 
     def _get_by(self, field_name, field_value) -> Receipt | None:
-        with self._conn.cursor() as cursor:
+        with self._conn.cursor(row_factory=self.class_row) as cursor:
             query = sql.SQL("SELECT * FROM receipts WHERE {0} = {1}").format(sql.Identifier(field_name), sql.Literal(field_value))
             
             receipt = cursor.execute(query).fetchone()
-            # self._conn.commit()
             return receipt

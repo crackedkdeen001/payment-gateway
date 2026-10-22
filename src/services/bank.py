@@ -27,24 +27,23 @@ class BankService:
         async with AsyncClient() as client:
             response = await client.post(url=url, json=request_class.model_dump(), headers=generate_idempotency_key_header())
             
-            print(response.url)
             if response.status_code == status.HTTP_200_OK:
                 return response_class(**response.json())
 
             return BankError(**response.json(), status_code=response.status_code)
     
     @classmethod
-    async def authorize(cls, data: BankAuthorizeRequest) -> BankAuthorizeResponse | dict[str, Any]:
-            return await cls.__request(url=auth_url, request_class=data, response_class=BankAuthorizeResponse)
+    async def authorize(cls, data: BankAuthorizeRequest) -> BankAuthorizeResponse | BankError:
+        return await cls.__request(url=auth_url, request_class=data, response_class=BankAuthorizeResponse)
 
     @classmethod
-    async def capture(cls, data: BankCaptureRequest) -> BankCaptureResponse | dict[str, Any]:
+    async def capture(cls, data: BankCaptureRequest) -> BankCaptureResponse | BankError:
         return await cls.__request(url=capture_url, request_class=data, response_class=BankCaptureResponse)
 
     @classmethod
-    async def void(cls, data: BankVoidRequest) -> BankVoidResponse | dict[str, Any]:
+    async def void(cls, data: BankVoidRequest) -> BankVoidResponse | BankError:
         return await cls.__request(url=void_url, request_class=data, response_class=BankVoidResponse)
 
     @classmethod
-    async def refund(cls, data: BankVoidRequest) -> BankVoidResponse | dict[str, Any]:
+    async def refund(cls, data: BankRefundResponse) -> BankRefundResponse | BankError:
         return await cls.__request(url=refund_url, request_class=data, response_class=BankRefundResponse)

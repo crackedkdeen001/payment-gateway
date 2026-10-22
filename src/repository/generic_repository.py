@@ -7,9 +7,10 @@ class GenericRepository:
         self._conn = connection
         self.columns = None
         self.table_name = None
+        self.class_row = None
         
     def update(self, model, **params) -> BaseModel | None:
-        with self._conn.cursor() as cursor:
+        with self._conn.cursor(self.class_row) as cursor:
             values = []
             set_clause = []
 
@@ -39,7 +40,8 @@ class GenericRepository:
             sql.Literal(model.id)
             )
 
-            updated_key = cursor.execute(query, values).fetchone()
-            # self._conn.commit()
-            
-            return updated_key
+            updated_key = cursor.execute(query, values)
+            return updated_key.fetchone()
+
+    def commit(self):
+         self._conn.commit()

@@ -1,8 +1,6 @@
-from .setup import get_conn_string, get_connection, Conn
+from .setup import get_dsn
 
 
 __all__ = [
-    "get_connection",
-    "get_conn_string",
-    "Conn"
+    "get_dsn"
 ]

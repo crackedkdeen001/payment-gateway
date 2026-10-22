@@ -9,13 +9,13 @@ from psycopg import Connection
 class IdempotencyRepository(GenericRepository):
     def __init__(self, connection: Connection):
         super().__init__(connection)
-        self._conn.row_factory = class_row(IdempotencyKey)  
         self.columns = IdempotencyKey.model_fields.keys()
         self.table_name = "idempotency_keys"
+        self.class_row = class_row(IdempotencyKey)
         
 
     def create(self, idempotency_record: IdempotencyKey):
-        with self._conn.cursor() as cursor:
+        with self._conn.cursor(row_factory=self.class_row) as cursor:
             fields = idempotency_record.model_dump(exclude={"id", "created_at"})
             
             # delete fields that are made at db level
@@ -31,10 +31,10 @@ class IdempotencyRepository(GenericRepository):
             params=fields
             )
             # self._conn.commit()
-            return row.fetchone
+            return row.fetchone()
 
     def get(self, idempotency_key: str, request_path) -> IdempotencyKey | None:
-        with self._conn.cursor() as cursor:
+        with self._conn.cursor(row_factory=self.class_row) as cursor:
             row = cursor.execute(
             """
             SELECT * FROM idempotency_keys 
@@ -47,7 +47,3 @@ class IdempotencyRepository(GenericRepository):
         
     def update(self, model: IdempotencyKey, **params)-> IdempotencyKey | None:
         super().update(model, **params)
-               
-                    
-            
-        

@@ -1,7 +1,9 @@
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import BeforeValidator, Field
+
+from src.exceptions.exception import IDParsingError
 
 receipt_prefix = "rex_"
 order_prefix = "orx_"
@@ -20,9 +22,9 @@ def create_prefixed_customer_id(customer_id):
 def create_prefixed_receipt_id(receipt_id):
     return receipt_prefix + str(receipt_id)
 
-def remove_prefix(id: str, prefix:str):
+def remove_prefix(id: str, prefix:str, name:str):
     if not id.startswith(prefix):
-        raise ValueError(f"{id} is an invalid ID, it should start with {order_prefix}")
+        raise IDParsingError(f"Invalid {name} ID, {prefix} is missing")
 
     return id.removeprefix(prefix)
 
@@ -30,31 +32,35 @@ def remove_prefix(id: str, prefix:str):
 # check if the id sent has the prefix, we return an error if it doesn't.
 # remove the prefix specified in the function parameter and return it back
 # if the prefix is "rex_" or "cux_", parse it as an integer, else we parse it as an UUID and return to the sender
-def parse_order_id(uuid_id: str) -> str:
-    original_id = remove_prefix(uuid_id, order_prefix)
+def parse_order_id(order_id: str, name: str = "order_id") -> str:
+    original_id = remove_prefix(order_id, order_prefix, name=name)
     try:
-        try_id = UUID(original_id)
+        test_id = UUID(original_id)
     except ValueError:
-        raise ValueError(f"{uuid_id} is an invalid ID, it must be a UUID with {order_prefix} at the beginning")
+        raise IDParsingError("Invalid order ID")
         
-    return original_id
+    return order_id
 
-def parse_integer_ids(integer_id: str, prefix: str):
-    original_id = remove_prefix(integer_id, prefix)
+def parse_integer_ids(integer_id: str, prefix: str, name: str):
+    original_id = remove_prefix(integer_id, prefix, name)
     try:
-        try_id = int(original_id)
+        
+        test_id = int(original_id)
     except ValueError:
-        raise ValueError(f"{integer_id} is an invalid ID, it must be an number with {prefix} at the beginning")
+        raise ValueError(f"Invalid {name} ID")
 
-    return original_id
+    return integer_id
 
 
 def parse_customer_id(id: str) -> str:
-    return parse_integer_ids(id, prefix=customer_prefix)
+    return parse_integer_ids(id, prefix=customer_prefix, name="customer")
 
 
 def parse_receipt_id(id: str) -> str:
-    return parse_integer_ids(id, prefix=receipt_prefix)
+    return parse_integer_ids(id, prefix=receipt_prefix, name="receipt")
 
 
-currency = Annotated[str, Field(min_length=3, max_length=3)]
+OrderID = Annotated[str, BeforeValidator(parse_order_id)]
+CustomerID = Annotated[str, BeforeValidator(parse_customer_id)]
+ReceiptID = Annotated[str, BeforeValidator(parse_receipt_id)]
+PositiveAmount = Annotated[int, Field(ge=1)]

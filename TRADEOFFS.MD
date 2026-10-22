@@ -10,3 +10,8 @@ todo
 
 # Todo 
 Change test code to reflect no trigger on bank ref time change
+
+- Changed state machine and idempotency Middleware to a single class housing both so only one connection is used per request instead of 2.
+- Switched the Idempotency layer and state machine order. The tradeoff involved is that receipts trigger the idempotency layer even though the transition may be wrong but the way the cached results are fetched (key + request path) prevents it from returning a result as a key can only be used once per path.
+- This also allows us to return cached responses in an easier fashion, as with the state machine first, we'd have allow a captured receipt on the /capture endpoint bypass to the idempotency layer to return the saved response.
+- But this doesn't guarantee it as if the response isn't returned due to let's say the process dying before hand and response was saved. Since the caller can't use the same key per request, he'd have a
