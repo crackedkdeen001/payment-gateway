@@ -6,7 +6,7 @@ from src.exceptions import DIFFERENT_PARAMS_WITH_SAME_IDEMPOTENCY_KEY, IDEMPOTEN
 
 client = TestClient(app)
 
-def test_same_request_with_same_idempotency_key_returns_an_idempotent_response_on_subsequent_requests(test_postgresql, data, idempotency_header):
+def test_same_request_with_same_idempotency_key_returns_an_idempotent_response_on_subsequent_requests(test_database, data, idempotency_header):
     response = client.post("/authorize", json=data, headers=idempotency_header)
         
     assert response.status_code == status.HTTP_200_OK
@@ -25,15 +25,16 @@ def test_same_request_with_same_idempotency_key_returns_an_idempotent_response_o
     assert second_idempotent_response.headers["x-idempotent-replayed"] == "true"
 
 
-def test_no_idempotency_key_in_request_returns_an_error(test_postgresql, data):
+def test_no_idempotency_key_in_request_returns_an_error(test_database, data):
     response = client.post("/authorize", json=data)
     
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.json()["message"] ==  "Field: ('header', 'X-Idempotency-Key'), Error: Field required"
     
-def test_same_idempotency_key_with_different_request_parameters_returns_an_error(test_postgresql, data, idempotency_header):
+def test_same_idempotency_key_with_different_request_parameters_returns_an_error(test_database, data, idempotency_header):
     valid_response = client.post("/authorize", json=data, headers=idempotency_header)
     
+    print(valid_response.json())
     assert valid_response.status_code == status.HTTP_200_OK
     
     data["amount_in_cents"] = 400
@@ -44,7 +45,7 @@ def test_same_idempotency_key_with_different_request_parameters_returns_an_error
     assert invalid_response.json() == {"status":"error", "message":DIFFERENT_PARAMS_WITH_SAME_IDEMPOTENCY_KEY}
     
 
-def test_request_with_too_long_idempotency_key_should_return_an_error(test_postgresql, data) :
+def test_request_with_too_long_idempotency_key_should_return_an_error(test_database, data) :
     idempotency_header = {"X-Idempotency-Key": "a"*101} # idempotency key should be at most 100 chars long
     
     response = client.post("/authorize", json=data, headers=idempotency_header)
