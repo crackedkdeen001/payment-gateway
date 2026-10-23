@@ -52,7 +52,7 @@ class BankVoidRequest(ParamsForAuthIDDependentEndpoints):
     pass
 
 class BankCaptureRequest(ParamsForAuthIDDependentEndpoints):
-    pass
+    amount: PositiveAmount
 
 class BankRefundRequest(BaseModel):
     capture_id: str
