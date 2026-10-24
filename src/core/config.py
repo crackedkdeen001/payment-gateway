@@ -25,5 +25,6 @@ class Config(BaseSettings):
     BANK_API_URL: str
 
     IDEMPOTENCY_KEY_LENGTH: int = 100
+    MAX_RETRY: int = 5
 
 settings = Config()

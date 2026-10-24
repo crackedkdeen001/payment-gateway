@@ -5,7 +5,7 @@ from .helpers import toJsonb
 settings = Config()
 
 __all__ = [
-    "settings",
     "logger",
+    "settings",
     "toJsonb",
 ]

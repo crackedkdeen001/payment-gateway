@@ -3,14 +3,16 @@ from pydantic import BaseModel
 
 
 class GenericRepository:
+    class_row = None
+    
     def __init__(self, connection: Connection):
         self._conn = connection
         self.columns = None
         self.table_name = None
-        self.class_row = None
+        self.class_row = type(self).class_row
         
     def update(self, model, **params) -> BaseModel | None:
-        with self._conn.cursor(self.class_row) as cursor:
+        with self._conn.cursor(row_factory=self.class_row) as cursor:
             values = []
             set_clause = []
 
@@ -19,7 +21,7 @@ class GenericRepository:
                 if field in self.columns:
                     values.append(value)
 
-                # build the  statement dynamically
+                # build the SET statement dynamically
                 set_clause.append(
                     sql.SQL("{} = {}").format(
                         sql.Identifier(field),
@@ -39,7 +41,7 @@ class GenericRepository:
             sql.SQL(", ").join(set_clause),
             sql.Literal(model.id)
             )
-
+            
             updated_key = cursor.execute(query, values)
             return updated_key.fetchone()
 

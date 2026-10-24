@@ -7,11 +7,12 @@ from psycopg import Connection
 
 
 class IdempotencyRepository(GenericRepository):
+    class_row = class_row(IdempotencyKey)
+    
     def __init__(self, connection: Connection):
         super().__init__(connection)
         self.columns = IdempotencyKey.model_fields.keys()
         self.table_name = "idempotency_keys"
-        self.class_row = class_row(IdempotencyKey)
         
 
     def create(self, idempotency_record: IdempotencyKey):

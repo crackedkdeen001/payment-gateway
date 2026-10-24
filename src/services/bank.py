@@ -1,12 +1,13 @@
-from time import clock_settime
-from typing import Any
 from uuid import uuid4
+import asyncio
+
+import math
 
 from src.core import settings
 from src.dtos.responses import BankAuthorizeResponse, BankCaptureResponse, BankVoidResponse, BankRefundResponse, BankError
 from src.dtos.requests import BankAuthorizeRequest, BankCaptureRequest, BankRefundRequest, BankVoidRequest
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from fastapi import status
 
 BankRequest = BankAuthorizeRequest | BankCaptureRequest | BankRefundRequest | BankVoidRequest
@@ -25,12 +26,22 @@ class BankService:
     @classmethod
     async def __request(cls, url: str, request_class: BankRequest, response_class: BankResponse):
         async with AsyncClient() as client:
-            response = await client.post(url=url, json=request_class.model_dump(), headers=generate_idempotency_key_header())
+            retries = 0
+            while True: 
+                wait_in_milliseconds = int((math.pow(2, retries) - 1) * 100) / 1000 # to milliseconds
+                await asyncio.sleep(wait_in_milliseconds)
+                response = await client.post(url=url, json=request_class.model_dump(), headers=generate_idempotency_key_header())
             
-            if response.status_code == status.HTTP_200_OK:
-                return response_class(**response.json())
-
-            return BankError(**response.json(), status_code=response.status_code)
+                if response.status_code == status.HTTP_200_OK:
+                    return response_class(**response.json())
+                
+                if response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
+                    if retries > settings.MAX_RETRY:
+                        return BankError(error="max_retry_exceeded", message="max retry exceeded to bank, please try again later", status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
+                    retries += 1
+                    continue
+                    
+                return BankError(**response.json(), status_code=response.status_code)
     
     @classmethod
     async def authorize(cls, data: BankAuthorizeRequest) -> BankAuthorizeResponse | BankError:
@@ -47,3 +58,6 @@ class BankService:
     @classmethod
     async def refund(cls, data: BankRefundResponse) -> BankRefundResponse | BankError:
         return await cls.__request(url=refund_url, request_class=data, response_class=BankRefundResponse)
+
+
+

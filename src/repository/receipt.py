@@ -7,11 +7,12 @@ from src.models import Receipt
 from src.repository.generic_repository import GenericRepository
 
 class ReceiptRepository(GenericRepository):
+    class_row = class_row(Receipt)
+
     def __init__(self, connection: Connection):
         super().__init__(connection)
         self.columns = Receipt.model_fields.keys()
         self.table_name = "receipts"
-        self.class_row = class_row(Receipt)
         
     # create a receipt in the database
     def create(self, receipt: Receipt):
@@ -36,6 +37,21 @@ class ReceiptRepository(GenericRepository):
             
     def update(self, model: Receipt, **params) -> Receipt | None:
         return super().update(model, **params)
+
+    def create_audit(self, receipt: Receipt, action: str) -> None:
+        fields = receipt.model_dump(exclude={"id", "created_at"})
+        fields["receipt_id"] = receipt.id
+        fields["action"] = action
+        columns = ("receipt_id", "order_id", "customer_id", "amount_in_cents", "currency",
+                   "card_number", "card_cvv", "card_expiry_month", "card_expiry_year",
+                   "current_state", "authorize_id", "authorized_at", "capture_id", "captured_at",
+                   "void_id", "voided_at", "refund_id", "refunded_at", "action")
+        with self._conn.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO receipts_audit (" + ", ".join(columns) + ") VALUES (" +
+                ", ".join("%(" + column + ")s" for column in columns) + ")",
+                fields,
+            )
     
     def get_by_id(self, receipt_id: int) -> Receipt | None:
         return self._get_by(field_name="id", field_value=receipt_id)

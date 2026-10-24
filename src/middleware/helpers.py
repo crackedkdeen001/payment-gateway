@@ -1,7 +1,7 @@
 from uuid import UUID
 
-from dtos.helpers import order_prefix
-from exceptions.exception import IDParsingError
+from src.dtos.helpers import order_prefix
+from src.exceptions.exception import IDParsingError
 
 
 def parse_order_id(order_id: str) -> UUID:

@@ -7,9 +7,8 @@ from fastapi.routing import APIRoute
 from starlette import status
 from starlette.responses import JSONResponse
 
-from middleware.helpers import parse_order_id
+from src.middleware.helpers import parse_order_id
 from src.exceptions.exception import IDParsingError
-
 from src.db import get_dsn
 from src.exceptions import EMPTY_REQUEST_BODY
 from src.middleware.idempotency import IDEMPOTENCY_HEADER, Idempotency
