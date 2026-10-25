@@ -1,3 +1,4 @@
+import logging
 from uuid import uuid4
 import asyncio
 
@@ -29,6 +30,7 @@ class BankService:
             retries = 0
             while True: 
                 wait_in_milliseconds = int((math.pow(2, retries) - 1) * 100) / 1000 # to milliseconds
+                logging.info(f"wait: {wait_in_milliseconds}, retry_count: {retries}")
                 await asyncio.sleep(wait_in_milliseconds)
                 response = await client.post(url=url, json=request_class.model_dump(), headers=generate_idempotency_key_header())
             
@@ -36,8 +38,11 @@ class BankService:
                     return response_class(**response.json())
                 
                 if response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
-                    if retries > settings.MAX_RETRY:
-                        return BankError(error="max_retry_exceeded", message="max retry exceeded to bank, please try again later", status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
+                    if retries >= settings.MAX_RETRY:
+                        return BankError(
+                            error="max_retry_exceeded", 
+                            message="max retry exceeded to bank, please try again later",
+                            status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
                     retries += 1
                     continue
                     

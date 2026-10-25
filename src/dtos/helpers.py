@@ -41,13 +41,12 @@ def parse_order_id(order_id: str, name: str = "order_id") -> str:
         
     return order_id
 
-def parse_integer_ids(integer_id: str, prefix: str, name: str):
+def parse_integer_ids(integer_id: str, prefix: str, name: str) -> str:
     original_id = remove_prefix(integer_id, prefix, name)
     try:
-        
         test_id = int(original_id)
     except ValueError:
-        raise ValueError(f"Invalid {name} ID")
+        raise IDParsingError(f"Invalid {name} ID")
 
     return integer_id
 
