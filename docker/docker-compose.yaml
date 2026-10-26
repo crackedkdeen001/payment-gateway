@@ -53,7 +53,7 @@ services:
       DB_NAME: mockbank
       DB_SSLMODE: disable
       PORT: 8080
-      FAILURE_RATE: 1
+      FAILURE_RATE: 0.4
       MIN_LATENCY_MS: 100
       MAX_LATENCY_MS: 2000
       AUTH_EXPIRY_HOURS: 168

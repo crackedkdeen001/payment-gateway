@@ -1,10 +1,16 @@
+import math
+import asyncio
+import f
+
+import psycopg
 import uvicorn
 from uuid import UUID
-from fastapi import Depends, FastAPI, Request, status, HTTPException, APIRouter
+from fastapi import Depends, FastAPI, Request, Response, status, HTTPException, APIRouter
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from psycopg import Connection
 
+from src.core import logger, settings
 from src.dtos.requests import (
     AuthorizeReceiptRequest,
     CaptureReceiptRequest,
@@ -26,7 +32,38 @@ from src.services.bank import BankService
 
 
 app = FastAPI()
+retries = 0
 
+@app.middleware("http")
+# async def retry_middleware(request: Request, call_next):
+#     try:
+#         response: Response = await call_next(request)
+#         
+#         global retries
+#         while True:
+#             if response.status_code >= 500:
+#                 wait_in_milliseconds = (int((math.pow(2, retries) - 1) * 100) / 1000)  # to milliseconds
+#                 logger.info(f"wait: {wait_in_milliseconds}, retry_count: {retries}")
+#                 await asyncio.sleep(wait_in_milliseconds)
+#                 
+#                 if retries == settings.MAX_RETRY:
+#                     return response
+#                 
+#                 retries += 1
+#                 continue
+#             else:
+#                 break
+#                 
+#         return response
+#     except psycopg.Error:
+#         retries += 1
+#         response: Response = await call_next(request)
+#         
+#         if retries == settings.MAX_RETRY:
+#             return response
+
+        
+:
 
 idempotent_endpoints = APIRouter(route_class= PaymentRoute, dependencies=[Depends(idempotency_header)])
 
@@ -44,7 +81,7 @@ def http_exception_handler(request: Request, exc: HTTPException):
 
 @app.exception_handler(Exception)
 def general_exception_handler(request:Request, exc: Exception):
-    return JSONResponse({"status":"error", "message":"Internal Server Error"})
+    return JSONResponse({"status":"error", "message":"Internal Server Error"}, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR    )
 
 @idempotent_endpoints.post("/authorize", summary="Authorize a transaction")
 async def authorize(authorize_request: AuthorizeReceiptRequest, request: Request):

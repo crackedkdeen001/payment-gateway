@@ -4,7 +4,7 @@ import asyncio
 
 import math
 
-from src.core import settings
+from src.core import settings, logger
 from src.dtos.responses import BankAuthorizeResponse, BankCaptureResponse, BankVoidResponse, BankRefundResponse, BankError
 from src.dtos.requests import BankAuthorizeRequest, BankCaptureRequest, BankRefundRequest, BankVoidRequest
 
@@ -30,7 +30,7 @@ class BankService:
             retries = 0
             while True: 
                 wait_in_milliseconds = int((math.pow(2, retries) - 1) * 100) / 1000 # to milliseconds
-                logging.info(f"wait: {wait_in_milliseconds}, retry_count: {retries}")
+                logger.info(f"Retry in.... {wait_in_milliseconds}, retry_count: {retries}")
                 await asyncio.sleep(wait_in_milliseconds)
                 response = await client.post(url=url, json=request_class.model_dump(), headers=generate_idempotency_key_header())
             
