@@ -34,7 +34,7 @@ from src.services.bank import BankService
 app = FastAPI()
 retries = 0
 
-@app.middleware("http")
+# @app.middeware("http")
 # async def retry_middleware(request: Request, call_next):
 #     try:
 #         response: Response = await call_next(request)
@@ -63,7 +63,6 @@ retries = 0
 #             return response
 
         
-:
 
 idempotent_endpoints = APIRouter(route_class= PaymentRoute, dependencies=[Depends(idempotency_header)])
 

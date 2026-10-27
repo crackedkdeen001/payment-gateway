@@ -20,19 +20,16 @@ void_url = settings.BANK_API_URL + "/voids"
 refund_url = settings.BANK_API_URL + "/refunds"
 
 
-def generate_idempotency_key_header():
-    return {"idempotency-key":str(uuid4())}
-
 class BankService:
     @classmethod
-    async def __request(cls, url: str, request_class: BankRequest, response_class: BankResponse):
+    async def __request(cls, url: str, request_class: BankRequest, response_class: BankResponse, idempotency_key: str):
         async with AsyncClient() as client:
             retries = 0
             while True: 
                 wait_in_milliseconds = int((math.pow(2, retries) - 1) * 100) / 1000 # to milliseconds
                 logger.info(f"Retry in.... {wait_in_milliseconds}, retry_count: {retries}")
                 await asyncio.sleep(wait_in_milliseconds)
-                response = await client.post(url=url, json=request_class.model_dump(), headers=generate_idempotency_key_header())
+                response = await client.post(url=url, json=request_class.model_dump(), headers={"idempotency-key":idempotency_key})
             
                 if response.status_code == status.HTTP_200_OK:
                     return response_class(**response.json())
@@ -49,20 +46,20 @@ class BankService:
                 return BankError(**response.json(), status_code=response.status_code)
     
     @classmethod
-    async def authorize(cls, data: BankAuthorizeRequest) -> BankAuthorizeResponse | BankError:
-        return await cls.__request(url=auth_url, request_class=data, response_class=BankAuthorizeResponse)
+    async def authorize(cls, data: BankAuthorizeRequest, idempotency_key: str) -> BankAuthorizeResponse | BankError:
+        return await cls.__request(url=auth_url, request_class=data, response_class=BankAuthorizeResponse, idempotency_key=idempotency_key)
 
     @classmethod
-    async def capture(cls, data: BankCaptureRequest) -> BankCaptureResponse | BankError:
-        return await cls.__request(url=capture_url, request_class=data, response_class=BankCaptureResponse)
+    async def capture(cls, data: BankCaptureRequest, idempotency_key: str) -> BankCaptureResponse | BankError:
+        return await cls.__request(url=capture_url, request_class=data, response_class=BankCaptureResponse,idempotency_key=idempotency_key)
 
     @classmethod
-    async def void(cls, data: BankVoidRequest) -> BankVoidResponse | BankError:
-        return await cls.__request(url=void_url, request_class=data, response_class=BankVoidResponse)
+    async def void(cls, data: BankVoidRequest, idempotency_key: str) -> BankVoidResponse | BankError:
+        return await cls.__request(url=void_url, request_class=data, response_class=BankVoidResponse, idempotency_key=idempotency_key)
 
     @classmethod
-    async def refund(cls, data: BankRefundResponse) -> BankRefundResponse | BankError:
-        return await cls.__request(url=refund_url, request_class=data, response_class=BankRefundResponse)
+    async def refund(cls, data: BankRefundResponse, idempotency_key: str) -> BankRefundResponse | BankError:
+        return await cls.__request(url=refund_url, request_class=data, response_class=BankRefundResponse, idempotency_key=idempotency_key)
 
 
 
