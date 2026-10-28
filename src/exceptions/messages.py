@@ -4,3 +4,6 @@ DIFFERENT_PARAMS_WITH_SAME_IDEMPOTENCY_KEY = "Idempotency key has been used on t
 INTERNAL_SERVER_ERROR = "Internal Server Error"
 EMPTY_REQUEST_BODY = "Empty request body"
 RECEIPT_DOES_NOT_EXIST = "Receipt not found"
+AUTHORIZATION_EXPIRED = "Authorization has expired"
+AUTHORIZATION_DOES_NOT_EXIST = "Authorization not found for this receipt"
+AMOUNT_MISMATCH = "Amount does not match the authorized amount"

@@ -26,25 +26,29 @@ class PaymentRoute(APIRoute):
             # one connection (and one transaction) for the whole request
             with psycopg.connect(get_dsn()) as conn:
                 request.state.conn = conn
-
-                # 1. state machine: is this request allowed to touch the receipt?
-                state_machine = StateMachine(conn)
-                try:
-                    order_id = parse_order_id(body["order_id"])
-                except (IDParsingError, KeyError, TypeError, AttributeError):
-                    raise HTTPException(detail="Invalid order ID", status_code=status.HTTP_400_BAD_REQUEST)
-
-                error = state_machine.check(request.url.path, order_id)
-                if error is not None:
-                    return error
-
-                # 2. idempotency: replay the cached response or run the request
+                
+                # 1. idempotency: replay the cached response or run the request
                 idempotency = Idempotency(conn)
                 key = request.headers.get(IDEMPOTENCY_HEADER)
                 
                 cached = idempotency.replay(key, request.url.path, body)
                 if cached is not None:
                     return cached
+
+                # 2. state machine: is this request allowed to touch the receipt?
+                state_machine = StateMachine(conn)
+                try:
+                    order_id = body.get("order_id", None)
+                    if order_id is None:
+                        raise HTTPException(detail="Order ID  is missing", status_code=status.HTTP_400_BAD_REQUEST)
+                    
+                    order_id = parse_order_id(order_id)
+                except IDParsingError:
+                    raise HTTPException(detail="Invalid order ID", status_code=status.HTTP_400_BAD_REQUEST)
+
+                error = state_machine.check(request.url.path, order_id)
+                if error is not None:
+                    return error
 
                 response = await original_route_handler(request)
 

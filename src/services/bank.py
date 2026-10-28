@@ -1,8 +1,8 @@
-import logging
-from uuid import uuid4
 import asyncio
 
 import math
+
+import httpx2
 
 from src.core import settings, logger
 from src.dtos.responses import BankAuthorizeResponse, BankCaptureResponse, BankVoidResponse, BankRefundResponse, BankError
@@ -20,30 +20,40 @@ void_url = settings.BANK_API_URL + "/voids"
 refund_url = settings.BANK_API_URL + "/refunds"
 
 
+def is_not_retryable(retry_count):
+    return retry_count >= settings.MAX_RETRY
+
+
 class BankService:
     @classmethod
     async def __request(cls, url: str, request_class: BankRequest, response_class: BankResponse, idempotency_key: str):
         async with AsyncClient() as client:
             retries = 0
             while True: 
-                wait_in_milliseconds = int((math.pow(2, retries) - 1) * 100) / 1000 # to milliseconds
-                logger.info(f"Retry in.... {wait_in_milliseconds}, retry_count: {retries}")
-                await asyncio.sleep(wait_in_milliseconds)
-                response = await client.post(url=url, json=request_class.model_dump(), headers={"idempotency-key":idempotency_key})
-            
-                if response.status_code == status.HTTP_200_OK:
-                    return response_class(**response.json())
-                
-                if response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
-                    if retries >= settings.MAX_RETRY:
+                try:
+                    if is_not_retryable(retries):
                         return BankError(
                             error="max_retry_exceeded", 
                             message="max retry exceeded to bank, please try again later",
                             status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
+                    
+                    wait_in_milliseconds = int((math.pow(2, retries) - 1) * 100) / 1000 # to milliseconds
+                    logger.info(f"Retry in.... {wait_in_milliseconds}, retry_count: {retries}")
+                    await asyncio.sleep(wait_in_milliseconds)
+                    
+                    response = await client.post(url=url, json=request_class.model_dump(), headers={"idempotency-key":idempotency_key})
+                    if response.status_code == status.HTTP_200_OK:
+                        return response_class(**response.json())
+                    
+                    if response.status_code >=  status.HTTP_500_INTERNAL_SERVER_ERROR:
+                        retries += 1
+                        continue
+                        
+                    return BankError(**response.json(), status_code=response.status_code)
+                except httpx2.TransportError:
                     retries += 1
                     continue
                     
-                return BankError(**response.json(), status_code=response.status_code)
     
     @classmethod
     async def authorize(cls, data: BankAuthorizeRequest, idempotency_key: str) -> BankAuthorizeResponse | BankError:

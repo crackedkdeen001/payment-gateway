@@ -17,7 +17,7 @@ class ReceiptRepository(GenericRepository):
     # create a receipt in the database
     def create(self, receipt: Receipt):
         with self._conn.cursor(row_factory=self.class_row) as  cursor:
-            fields = receipt.model_dump(exclude={"id", "created_at"}) 
+            fields = receipt.model_dump(exclude={"id", "created_at"})
             query = """
             INSERT INTO receipts 
             (order_id, customer_id, amount_in_cents, currency,
@@ -29,6 +29,7 @@ class ReceiptRepository(GenericRepository):
                     %(current_state)s, %(authorize_id)s, %(authorized_at)s, %(auth_expiry)s,
                     %(capture_id)s, %(captured_at)s, %(void_id)s, %(voided_at)s,
                     %(refund_id)s, %(refunded_at)s)
+            ON CONFLICT(order_id) DO NOTHING
             RETURNING *;
             """ 
             receipt = cursor.execute(query, params=fields)

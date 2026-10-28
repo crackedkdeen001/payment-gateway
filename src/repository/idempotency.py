@@ -2,7 +2,7 @@ from psycopg.rows import class_row
 
 from src.repository.generic_repository import GenericRepository
 from src.models import IdempotencyKey
-from src.core import toJsonb
+from src.repository.helpers import toJson
 from psycopg import Connection
 
 
@@ -20,8 +20,8 @@ class IdempotencyRepository(GenericRepository):
             fields = idempotency_record.model_dump(exclude={"id", "created_at"})
             
             # delete fields that are made at db level
-            fields["request_body"] = toJsonb(fields["request_body"])
-            fields["response_body"] = toJsonb(fields["response_body"])
+            fields["request_body"] = toJson(fields["request_body"])
+            fields["response_body"] = toJson(fields["response_body"])
 
             row = cursor.execute(
             """

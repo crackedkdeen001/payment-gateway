@@ -4,7 +4,7 @@ from psycopg import Connection
 from starlette.responses import JSONResponse, Response
 
 from src.exceptions import RECEIPT_DOES_NOT_EXIST
-from src.models import PaymentStates
+from src.models import PaymentStates, Receipt
 from src.repository import ReceiptRepository
 
 # the endpoints that are allowed for each state
@@ -44,7 +44,7 @@ class StateMachine:
 
 def invalid_transition_response(state: PaymentStates) -> JSONResponse:
     endpoints = ", ".join(VALID_ENDPOINTS.get(state, []))
-    message = "request can't be processed at this endpoint"
+    message = f"{state.capitalize()} receipts can't be processed at this endpoint"
     if endpoints:
         message = f"{message}. Try sending it to {endpoints}"
     return JSONResponse(content={"status": "error", "message": message},
