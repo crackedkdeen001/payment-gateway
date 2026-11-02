@@ -1,8 +1,10 @@
 from uuid import UUID
 
 from psycopg import Connection
+from starlette import status
 from starlette.responses import JSONResponse, Response
 
+from src.core import logger
 from src.exceptions import RECEIPT_DOES_NOT_EXIST
 from src.models import PaymentStates, Receipt
 from src.repository import ReceiptRepository
@@ -20,6 +22,7 @@ class StateMachine:
         self.receipt_repo = ReceiptRepository(connection=connection)
 
     def check(self, path: str, order_id: UUID) -> Response | None:
+        logger.info("validating the state of the receipt...")
         """None when the request may continue, an error response when it may not."""
         receipt = self.receipt_repo.get_by_order_id(order_id=order_id)
 
@@ -28,7 +31,7 @@ class StateMachine:
             if path == "/authorize":
                 return None
             return JSONResponse(content={"status": "error", "message": RECEIPT_DOES_NOT_EXIST},
-                                status_code=404)
+                                status_code=status.HTTP_404_NOT_FOUND)
 
         state = receipt.current_state
 

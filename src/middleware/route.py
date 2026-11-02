@@ -7,6 +7,7 @@ from fastapi.routing import APIRoute
 from starlette import status
 from starlette.responses import JSONResponse
 
+from src.core import logger
 from src.middleware.helpers import parse_order_id
 from src.exceptions.exception import IDParsingError
 from src.db import get_dsn

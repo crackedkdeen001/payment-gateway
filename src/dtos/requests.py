@@ -2,16 +2,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field
 
-from .helpers import OrderID, CustomerID, ReceiptID, PositiveAmount
-
-
-# --- For responses
-
-
-# -- for requests 
-# check if the id sent has the prefix, we return an error if it doesn't.
-# remove the prefix specified in the function parameter and return it back
-# if the prefix is "rex_" or "cux_", parse it as an integer, else we parse it as an UUID and return to the sender
+from .helpers import OrderID, CustomerID, ReceiptID, PositiveAmount, ValidMonth, ValidYear, ValidCurrency
 
 
 class GenericReceiptRequest(BaseModel):
@@ -21,9 +12,9 @@ class AuthorizeReceiptRequest(GenericReceiptRequest):
     customer_id: CustomerID
     card_number: Annotated[str, Field(min_length=13, max_length=19)]
     card_cvv: Annotated[str, Field(max_length=3)]
-    card_expiry_month: Annotated[int, Field(ge=1, le=12)]
-    card_expiry_year: Annotated[int, Field(ge=1800)]
-    currency: Annotated[str, Field(max_length=3)]
+    card_expiry_month: ValidMonth
+    card_expiry_year: ValidYear
+    currency: ValidCurrency
     amount: PositiveAmount
     
 class ParamsForReceiptIDDependentEndpoints(GenericReceiptRequest):

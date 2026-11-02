@@ -50,7 +50,7 @@ class BankRefundResponse(BaseModel):
     refund_id: str
     capture_id: str
     status: str
-    amount: str
+    amount: int
     currency: str
     refunded_at: datetime
     

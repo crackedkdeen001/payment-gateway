@@ -28,32 +28,30 @@ class BankService:
     @classmethod
     async def __request(cls, url: str, request_class: BankRequest, response_class: BankResponse, idempotency_key: str):
         async with AsyncClient() as client:
-            retries = 0
-            while True: 
+            for attempts in range(1, settings.MAX_RETRY + 1):
                 try:
-                    if is_not_retryable(retries):
-                        return BankError(
-                            error="max_retry_exceeded", 
-                            message="max retry exceeded to bank, please try again later",
-                            status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
-                    
-                    wait_in_milliseconds = int((math.pow(2, retries) - 1) * 100) / 1000 # to milliseconds
-                    logger.info(f"Retry in.... {wait_in_milliseconds}, retry_count: {retries}")
+                    wait_in_milliseconds = int((math.pow(2, attempts - 1) - 1) * 100) / 1000 # to milliseconds
+                    logger.info(f"Request Made to the Bank in.... {wait_in_milliseconds}, retry_count: {attempts}")
                     await asyncio.sleep(wait_in_milliseconds)
                     
-                    response = await client.post(url=url, json=request_class.model_dump(), headers={"idempotency-key":idempotency_key})
+                    response = await client.post(url=url, json=request_class.model_dump(), headers={"idempotency-key":idempotency_key}, timeout=100)
                     if response.status_code == status.HTTP_200_OK:
                         return response_class(**response.json())
                     
                     if response.status_code >=  status.HTTP_500_INTERNAL_SERVER_ERROR:
-                        retries += 1
                         continue
                         
                     return BankError(**response.json(), status_code=response.status_code)
                 except httpx2.TransportError:
-                    retries += 1
+                    if attempts == 3:
+                        break
                     continue
-                    
+
+        return BankError(
+            error="max_retry_exceeded",
+            message="Max retry exceeded to bank, please try again later",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
+
     
     @classmethod
     async def authorize(cls, data: BankAuthorizeRequest, idempotency_key: str) -> BankAuthorizeResponse | BankError:
@@ -68,7 +66,7 @@ class BankService:
         return await cls.__request(url=void_url, request_class=data, response_class=BankVoidResponse, idempotency_key=idempotency_key)
 
     @classmethod
-    async def refund(cls, data: BankRefundResponse, idempotency_key: str) -> BankRefundResponse | BankError:
+    async def refund(cls, data: BankRefundRequest, idempotency_key: str) -> BankRefundResponse | BankError:
         return await cls.__request(url=refund_url, request_class=data, response_class=BankRefundResponse, idempotency_key=idempotency_key)
 
 

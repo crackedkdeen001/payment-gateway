@@ -11,16 +11,19 @@ from src.dtos.requests import (
     CaptureReceiptRequest,
     VoidReceiptRequest,
     RefundReceiptRequest,
+    BankAuthorizeRequest,
+    BankCaptureRequest,
+    BankVoidRequest,
+    BankRefundRequest
 )
-from src.dependencies import idempotency_header
-from src.middleware.route import PaymentRoute
-from src.dtos.requests import BankAuthorizeRequest, BankCaptureRequest
-from src.dtos.responses import AuthorizeResponse, BankError, CaptureResponse
+from src.dtos.responses import AuthorizeResponse, BankError, CaptureResponse, VoidResponse, RefundResponse
 from src.dtos.helpers import (
     create_prefixed_customer_id,
     create_prefixed_order_id,
     create_prefixed_receipt_id,
 )
+from src.dependencies import idempotency_header
+from src.middleware.route import PaymentRoute
 from src.models import PaymentStates, Receipt
 from src.repository import ReceiptRepository
 from src.services.bank import BankService
@@ -144,17 +147,11 @@ async def capture(capture_request: CaptureReceiptRequest, request: Request):
     with conn.transaction():
         receipt = repository.get_by_id(receipt_id=int(capture_request.receipt_id.removeprefix("rex_")))
 
-        if receipt is None:
-            raise HTTPException(detail=RECEIPT_DOES_NOT_EXIST, status_code=status.HTTP_404_NOT_FOUND)
-
         if is_authorization_expired(receipt):
-            raise HTTPException(detail=AUTHORIZATION_EXPIRED, status_code=status.HTTP_400_BAD_REQUEST)
+            raise HTTPException(detail=AUTHORIZATION_EXPIRED, status_code=status.HTTP_410_GONE)
 
         if receipt.amount_in_cents != capture_request.amount:
             raise HTTPException(detail=AMOUNT_MISMATCH, status_code=status.HTTP_400_BAD_REQUEST)
-
-        if receipt.authorize_id is None:
-            raise HTTPException(detail=AUTHORIZATION_DOES_NOT_EXIST, status_code=status.HTTP_409_CONFLICT)
 
         authorization_id = receipt.authorize_id
         amount = receipt.amount_in_cents
@@ -193,13 +190,87 @@ async def capture(capture_request: CaptureReceiptRequest, request: Request):
 
 
 @idempotent_endpoints.post("/void", summary="Void an authorized transaction")
-async def void(idk: VoidReceiptRequest):
-    return idk.model_dump()
+async def void(void_request: VoidReceiptRequest, request: Request):
+    conn: psycopg.Connection = request.state.conn
+    repository = ReceiptRepository(connection=conn)
+    
+    with conn.transaction():
+        receipt = repository.get_by_id(int(void_request.receipt_id.removeprefix("rex_")))
+        
+        if is_authorization_expired(receipt):
+            raise HTTPException(detail=AUTHORIZATION_EXPIRED, status_code=status.HTTP_410_GONE)
 
+        authorization_id = receipt.authorize_id
+        
+    with conn.transaction():
+        bank_response = await BankService.void(
+            BankVoidRequest(
+                authorization_id=authorization_id
+            ),
+            idempotency_key=void_request.order_id
+        )
+        
+        if isinstance(bank_response, BankError):
+            raise HTTPException(detail=bank_response.message, status_code=bank_response.status_code)
+    
+    with conn.transaction():
+        repository.update(receipt,
+            current_state=PaymentStates.VOIDED,
+            void_id=bank_response.void_id,
+            voided_at=bank_response.voided_at
+        )
+        repository.create_audit(receipt, "upd")
+        
+        return VoidResponse(
+            receipt_id=create_prefixed_receipt_id(receipt.id),
+            order_id=create_prefixed_order_id(receipt.order_id),
+            customer_id=create_prefixed_customer_id(receipt.customer_id),
+            amount=receipt.amount_in_cents,
+            voided_at=bank_response.voided_at,
+            status=bank_response.status
+        )
 
 @idempotent_endpoints.post("/refund", summary="Refund a captured transaction")
-async def refund(idk: RefundReceiptRequest):
-    return idk.model_dump()
+async def refund(request: Request, refund_request: RefundReceiptRequest):
+    conn: psycopg.Connection = request.state.conn
+    repository = ReceiptRepository(connection=conn)
+
+    with conn.transaction():
+        receipt = repository.get_by_id(int(refund_request.receipt_id.removeprefix("rex_")))
+        
+        if receipt.amount_in_cents != refund_request.amount:
+            raise HTTPException(detail=AMOUNT_MISMATCH, status_code=status.HTTP_400_BAD_REQUEST)
+
+        capture_id = receipt.capture_id
+
+    with conn.transaction():
+        bank_response = await BankService.refund(
+            BankRefundRequest(
+                capture_id=capture_id,
+                amount=refund_request.amount
+            ),
+            idempotency_key=refund_request.order_id
+        )
+
+        if isinstance(bank_response, BankError):
+            raise HTTPException(detail=bank_response.message, status_code=bank_response.status_code)
+
+    with conn.transaction():
+        repository.update(receipt,
+                          current_state=PaymentStates.VOIDED,
+                          refund_id=bank_response.refund_id,
+                          refunded_at=bank_response.refunded_at
+                          )
+        repository.create_audit(receipt, "upd")
+
+        return RefundResponse(
+            receipt_id=create_prefixed_receipt_id(receipt.id),
+            order_id=create_prefixed_order_id(receipt.order_id),
+            customer_id=create_prefixed_customer_id(receipt.customer_id),
+            amount=receipt.amount_in_cents,
+            refunded_at=bank_response.refunded_at,
+            status=bank_response.status
+        )
 
 
 app.include_router(idempotent_endpoints)

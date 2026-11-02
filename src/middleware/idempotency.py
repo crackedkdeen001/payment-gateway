@@ -23,6 +23,7 @@ class Idempotency:
         # if it hasn't been seen before, it is a new request
         existing = self.repo.get(key, path)
         if existing is None:
+            logger.info("New request")
             return None
 
         # the same key with a different body is a client error
@@ -37,8 +38,6 @@ class Idempotency:
 
     def store(self, key: str, path: str, body: dict, response: Response):
         if not key:
-            return
-        if not 200 <= response.status_code < 300:
             return
 
         self.repo.create(IdempotencyKey(

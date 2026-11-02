@@ -16,3 +16,5 @@ Change test code to reflect no trigger on bank ref time change
 - This also allows us to return cached responses in an easier fashion, as with the state machine first, we'd have allow a captured receipt on the /capture endpoint bypass to the idempotency layer to return the saved response.
 - But this doesn't guarantee it as if the response isn't returned due to let's say the process dying before hand and response was saved. Since the caller can't use the same key per request, he'd have a
 - Phases in each request are wrapped in a transaction to ensure that the operation is either committed or it fails, no in between
+- Made the idempotency layer save the response regardless of whether it was a successful response or not because if the client retries
+- the same request with the same invalid request body, it will still reach the bank even though the parameters haven't changed.
