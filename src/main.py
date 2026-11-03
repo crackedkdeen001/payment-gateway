@@ -1,11 +1,10 @@
 import psycopg
 import uvicorn
-from uuid import UUID, uuid4
-from fastapi import Depends, FastAPI, Request, Response, status, HTTPException, APIRouter
+from uuid import UUID
+from fastapi import Depends, FastAPI, Request, status, HTTPException, APIRouter
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from src.core import logger, settings
 from src.dtos.requests import (
     AuthorizeReceiptRequest,
     CaptureReceiptRequest,
@@ -30,9 +29,7 @@ from src.services.bank import BankService
 from src.services.helpers import is_authorization_expired
 from src.exceptions import (
     AMOUNT_MISMATCH,
-    AUTHORIZATION_DOES_NOT_EXIST,
     AUTHORIZATION_EXPIRED,
-    RECEIPT_DOES_NOT_EXIST,
 )
 
 app = FastAPI()
@@ -59,6 +56,7 @@ def general_exception_handler(request: Request, exc: Exception):
                         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# noinspection unresolved-references,bad-argument-type
 @idempotent_endpoints.post("/authorize", summary="Authorize a transaction")
 async def authorize(authorize_request: AuthorizeReceiptRequest, request: Request):
     conn: psycopg.Connection = request.state.conn
@@ -88,7 +86,7 @@ async def authorize(authorize_request: AuthorizeReceiptRequest, request: Request
             created_at=None,
         ))
         
-        # If the receipt is none, it means it already exists in the database
+        # If the receipt is none, it means it already exists in the database, 
         # so we check whether it is retryable, if not, we return an error
         if receipt is None:
             receipt = repository.get_by_order_id(order_id=UUID(authorize_request.order_id.removeprefix("orx_")))
@@ -139,6 +137,7 @@ async def authorize(authorize_request: AuthorizeReceiptRequest, request: Request
         )
 
 
+# noinspection unresolved-references,bad-argument-type
 @idempotent_endpoints.post("/capture", summary="Capture an authorized transaction")
 async def capture(capture_request: CaptureReceiptRequest, request: Request):
     conn: psycopg.Connection = request.state.conn
@@ -163,11 +162,6 @@ async def capture(capture_request: CaptureReceiptRequest, request: Request):
         )
 
         if isinstance(bank_response, BankError):
-            if bank_response.status_code == status.HTTP_400_BAD_REQUEST:
-                return JSONResponse(
-                    content={"status": "error", "message": bank_response.message},
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                )
             raise HTTPException(status_code=bank_response.status_code, detail=bank_response.message)
     
     with conn.transaction():
@@ -189,6 +183,7 @@ async def capture(capture_request: CaptureReceiptRequest, request: Request):
         )
 
 
+# noinspection bad-argument-type,unresolved-references
 @idempotent_endpoints.post("/void", summary="Void an authorized transaction")
 async def void(void_request: VoidReceiptRequest, request: Request):
     conn: psycopg.Connection = request.state.conn
@@ -230,6 +225,8 @@ async def void(void_request: VoidReceiptRequest, request: Request):
             status=bank_response.status
         )
 
+
+# noinspection unresolved-references,bad-argument-type
 @idempotent_endpoints.post("/refund", summary="Refund a captured transaction")
 async def refund(request: Request, refund_request: RefundReceiptRequest):
     conn: psycopg.Connection = request.state.conn
@@ -257,7 +254,7 @@ async def refund(request: Request, refund_request: RefundReceiptRequest):
 
     with conn.transaction():
         repository.update(receipt,
-                          current_state=PaymentStates.VOIDED,
+                          current_state=PaymentStates.REFUNDED,
                           refund_id=bank_response.refund_id,
                           refunded_at=bank_response.refunded_at
                           )
