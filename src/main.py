@@ -286,6 +286,9 @@ def get_payment_status(order_id:Annotated[OrderID, Query()]):
    with psycopg.connect(get_dsn()) as conn: 
         repository = ReceiptRepository(connection=conn)
         receipt = repository.get_by_order_id(UUID(order_id.removeprefix("orx_")))
+
+        if receipt is None:
+            raise HTTPException(detail=RECEIPT_DOES_NOT_EXIST, status_code=status.HTTP_404_NOT_FOUND)
         
         return GeneralResponseFields(
             receipt_id=create_prefixed_receipt_id(receipt.id),
@@ -343,7 +346,6 @@ def verify_goods(receipt_id: ReceiptID):
             return JSONResponse(content={"status":"Eligible for shipping"})
         else:
             return JSONResponse(content={"status":"Not eligible for shipping"})
-
 
 
 app.include_router(idempotent_endpoints)
