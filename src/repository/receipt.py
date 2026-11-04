@@ -54,18 +54,29 @@ class ReceiptRepository(GenericRepository):
                 fields,
             )
     
-    def get_by_id(self, receipt_id: int) -> Receipt | None:
-        return self._get_by(field_name="id", field_value=receipt_id)
-        
-    def get_by_customer_id(self, customer_id: int) -> Receipt | None:
-        return self._get_by(field_name="customer_id", field_value=customer_id)
-
-    def get_by_order_id(self, order_id: UUID) -> Receipt | None:
-        return self._get_by(field_name="order_id", field_value=order_id)
-
     def _get_by(self, field_name, field_value) -> Receipt | None:
         with self._conn.cursor(row_factory=self.class_row) as cursor:
             query = sql.SQL("SELECT * FROM receipts WHERE {0} = {1}").format(sql.Identifier(field_name), sql.Literal(field_value))
             
             receipt = cursor.execute(query).fetchone()
             return receipt
+        
+    def get_by_id(self, receipt_id: int) -> Receipt | None:
+        return self._get_by(field_name="id", field_value=receipt_id)
+        
+    def get_history_by_customer_id(self, customer_id: int, limit: int, offset: int) -> list[Receipt] | None:
+        with self._conn.cursor(row_factory=self.class_row) as cursor:
+            query = sql.SQL(
+                "SELECT * FROM receipts WHERE {0} = {1} ORDER BY id LIMIT {2} OFFSET {3}"
+            ).format(
+                sql.Identifier("customer_id"),
+                sql.Literal(customer_id),
+                sql.Literal(limit),
+                sql.Literal(offset - 1)
+            )
+
+            receipts = cursor.execute(query).fetchall()
+            return receipts
+
+    def get_by_order_id(self, order_id: UUID) -> Receipt | None:
+        return self._get_by(field_name="order_id", field_value=order_id)

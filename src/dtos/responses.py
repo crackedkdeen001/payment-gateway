@@ -24,6 +24,11 @@ class VoidResponse(GeneralResponseFields):
 class RefundResponse(GeneralResponseFields):
     refunded_at: datetime
 
+class PaymentHistoryResponse(BaseModel):
+    page: int
+    total: int
+    receipts: list[GeneralResponseFields]
+
 class BankAuthorizeResponse(BaseModel):
     authorization_id: str
     status: str

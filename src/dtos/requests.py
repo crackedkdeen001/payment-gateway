@@ -29,6 +29,11 @@ class VoidReceiptRequest(ParamsForReceiptIDDependentEndpoints):
 class RefundReceiptRequest(ParamsForReceiptIDDependentEndpoints):
     amount: PositiveAmount
     
+class PaymentHistoryRequest(BaseModel):
+    customer_id: CustomerID
+    limit: PositiveAmount
+    offset: PositiveAmount
+    
 class BankAuthorizeRequest(BaseModel):
     card_number: str
     cvv: str

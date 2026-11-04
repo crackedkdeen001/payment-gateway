@@ -1,10 +1,14 @@
+from typing import Annotated
+
 import psycopg
 import uvicorn
 from uuid import UUID
-from fastapi import Depends, FastAPI, Request, status, HTTPException, APIRouter
+from fastapi import Depends, FastAPI, Request, Response, status, HTTPException, APIRouter, Query
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from src.exceptions.exception import IDParsingError
+from src.db.setup import get_dsn
 from src.dtos.requests import (
     AuthorizeReceiptRequest,
     CaptureReceiptRequest,
@@ -13,13 +17,16 @@ from src.dtos.requests import (
     BankAuthorizeRequest,
     BankCaptureRequest,
     BankVoidRequest,
-    BankRefundRequest
+    BankRefundRequest,
+    PaymentHistoryRequest
 )
-from src.dtos.responses import AuthorizeResponse, BankError, CaptureResponse, VoidResponse, RefundResponse
+from src.dtos.responses import AuthorizeResponse, BankError, CaptureResponse, VoidResponse, RefundResponse, GeneralResponseFields, PaymentHistoryResponse
 from src.dtos.helpers import (
     create_prefixed_customer_id,
     create_prefixed_order_id,
     create_prefixed_receipt_id,
+    OrderID,
+    ReceiptID
 )
 from src.dependencies import idempotency_header
 from src.middleware.route import PaymentRoute
@@ -30,6 +37,7 @@ from src.services.helpers import is_authorization_expired
 from src.exceptions import (
     AMOUNT_MISMATCH,
     AUTHORIZATION_EXPIRED,
+    RECEIPT_DOES_NOT_EXIST
 )
 
 app = FastAPI()
@@ -49,6 +57,10 @@ def request_validation_exception_handler(request: Request, exc: RequestValidatio
 def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(content={"status": "error", "message": exc.detail}, status_code=exc.status_code)
 
+
+@app.exception_handler(IDParsingError)
+def http_exception_handler(request: Request, exc: IDParsingError):
+    return JSONResponse(content={"status": "error", "message": exc.message}, status_code=status.HTTP_400_BAD_REQUEST)
 
 @app.exception_handler(Exception)
 def general_exception_handler(request: Request, exc: Exception):
@@ -268,6 +280,70 @@ async def refund(request: Request, refund_request: RefundReceiptRequest):
             refunded_at=bank_response.refunded_at,
             status=bank_response.status
         )
+
+@app.get("/status", summary="Get payment status of a receipt")
+def get_payment_status(order_id:Annotated[OrderID, Query()]):
+   with psycopg.connect(get_dsn()) as conn: 
+        repository = ReceiptRepository(connection=conn)
+        receipt = repository.get_by_order_id(UUID(order_id.removeprefix("orx_")))
+        
+        return GeneralResponseFields(
+            receipt_id=create_prefixed_receipt_id(receipt.id),
+            order_id=create_prefixed_order_id(receipt.order_id),
+            customer_id=create_prefixed_customer_id(receipt.customer_id),
+            status=receipt.current_state,
+            amount=receipt.amount_in_cents
+        )
+   
+@app.get("/history", summary="Get the payment history of a customer")
+def get_customer_history(payment_history_params:Annotated[PaymentHistoryRequest, Query()]):
+    with psycopg.connect(get_dsn()) as conn:
+        repository = ReceiptRepository(connection=conn)
+        
+        customer_id = int(payment_history_params.customer_id.removeprefix("cux_"))
+        
+        receipts = repository.get_history_by_customer_id(
+            customer_id,
+            payment_history_params.limit,
+            payment_history_params.offset
+        )
+        
+        if not receipts:
+            return JSONResponse(content={"detail":"No history found"}, status_code=status.HTTP_404_NOT_FOUND)
+        
+        processed_receipts = []
+        for receipt in receipts:
+            processed_receipts.append(
+                GeneralResponseFields(
+                    receipt_id=create_prefixed_receipt_id(receipt.id),
+                    order_id=create_prefixed_order_id(receipt.order_id),
+                    customer_id=create_prefixed_customer_id(receipt.customer_id),
+                    status=receipt.current_state,
+                    amount=receipt.amount_in_cents
+                )
+            )
+        
+        return PaymentHistoryResponse(
+            total=len(processed_receipts),
+            page=payment_history_params.offset,
+            receipts=processed_receipts
+        )            
+            
+@app.get("/verify", summary="Verify goods have been paid for before shipping")
+def verify_goods(receipt_id: ReceiptID):
+    with psycopg.connect(get_dsn()) as conn:
+        repository = ReceiptRepository(connection=conn)
+        
+        receipt = repository.get_by_id(int(receipt_id.removeprefix("rex_")))
+        
+        if receipt is None:
+            raise HTTPException(detail=RECEIPT_DOES_NOT_EXIST, status_code=status.HTTP_404_NOT_FOUND)
+        
+        if receipt.current_state == PaymentStates.CAPTURED:
+            return JSONResponse(content={"status":"Eligible for shipping"})
+        else:
+            return JSONResponse(content={"status":"Not eligible for shipping"})
+
 
 
 app.include_router(idempotent_endpoints)
