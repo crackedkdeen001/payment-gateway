@@ -1,3 +1,4 @@
+import psycopg
 from psycopg import Connection, sql
 from pydantic import BaseModel
 
@@ -5,14 +6,14 @@ from pydantic import BaseModel
 class GenericRepository:
     class_row = None
     
-    def __init__(self, connection: Connection):
+    def __init__(self, connection: psycopg.AsyncConnection):
         self._conn = connection
         self.columns = None
         self.table_name = None
         self.class_row = type(self).class_row
         
-    def update(self, model, **params) -> BaseModel | None:
-        with self._conn.cursor(row_factory=self.class_row) as cursor:
+    async def update(self, model, **params) -> BaseModel | None:
+       async with self._conn.cursor(row_factory=self.class_row) as cursor:
             values = []
             set_clause = []
 
@@ -42,8 +43,8 @@ class GenericRepository:
             sql.Literal(model.id)
             )
             
-            updated_key = cursor.execute(query, values)
-            return updated_key.fetchone()
+            updated_key = await cursor.execute(query, values)
+            return await updated_key.fetchone()
 
-    def commit(self):
-         self._conn.commit()
+    async def commit(self):
+         await self._conn.commit()

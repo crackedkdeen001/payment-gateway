@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from psycopg import Connection
+import psycopg
 from starlette import status
 from starlette.responses import JSONResponse, Response
 
@@ -18,13 +18,13 @@ VALID_ENDPOINTS = {
 
 
 class StateMachine:
-    def __init__(self, connection: Connection):
+    def __init__(self, connection: psycopg.AsyncConnection):
         self.receipt_repo = ReceiptRepository(connection=connection)
 
-    def check(self, path: str, order_id: UUID) -> Response | None:
+    async def check(self, path: str, order_id: UUID) -> Response | None:
         logger.info("validating the state of the receipt...")
         """None when the request may continue, an error response when it may not."""
-        receipt = self.receipt_repo.get_by_order_id(order_id=order_id)
+        receipt = await self.receipt_repo.get_by_order_id(order_id=order_id)
 
         # new payments are only allowed on the /authorize endpoint
         if receipt is None:

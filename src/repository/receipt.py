@@ -1,5 +1,6 @@
 from uuid import UUID
 
+import psycopg
 from psycopg import Connection, sql
 from psycopg.rows import class_row
 
@@ -9,14 +10,14 @@ from src.repository.generic_repository import GenericRepository
 class ReceiptRepository(GenericRepository):
     class_row = class_row(Receipt)
 
-    def __init__(self, connection: Connection):
+    def __init__(self, connection: psycopg.AsyncConnection):
         super().__init__(connection)
         self.columns = Receipt.model_fields.keys()
         self.table_name = "receipts"
         
     # create a receipt in the database
-    def create(self, receipt: Receipt):
-        with self._conn.cursor(row_factory=self.class_row) as  cursor:
+    async def create(self, receipt: Receipt):
+        async with self._conn.cursor(row_factory=self.class_row) as  cursor:
             fields = receipt.model_dump(exclude={"id", "created_at"})
             query = """
             INSERT INTO receipts 
@@ -32,14 +33,14 @@ class ReceiptRepository(GenericRepository):
             ON CONFLICT(order_id) DO NOTHING
             RETURNING *;
             """ 
-            receipt = cursor.execute(query, params=fields)
+            receipt = await cursor.execute(query, params=fields)
             
-            return receipt.fetchone()
+            return await receipt.fetchone()
             
-    def update(self, model: Receipt, **params) -> Receipt | None:
-        return super().update(model, **params)
+    async def update(self, model: Receipt, **params) -> Receipt | None:
+        return await super().update(model, **params)
 
-    def create_audit(self, receipt: Receipt, action: str) -> None:
+    async def create_audit(self, receipt: Receipt, action: str) -> None:
         fields = receipt.model_dump(exclude={"id", "created_at"})
         fields["receipt_id"] = receipt.id
         fields["action"] = action
@@ -47,25 +48,25 @@ class ReceiptRepository(GenericRepository):
                    "card_number", "card_cvv", "card_expiry_month", "card_expiry_year",
                    "current_state", "authorize_id", "authorized_at", "capture_id", "captured_at",
                    "void_id", "voided_at", "refund_id", "refunded_at", "action")
-        with self._conn.cursor() as cursor:
-            cursor.execute(
+        async with self._conn.cursor() as cursor:
+            await cursor.execute(
                 "INSERT INTO receipts_audit (" + ", ".join(columns) + ") VALUES (" +
                 ", ".join("%(" + column + ")s" for column in columns) + ")",
                 fields,
             )
     
-    def _get_by(self, field_name, field_value) -> Receipt | None:
-        with self._conn.cursor(row_factory=self.class_row) as cursor:
+    async def _get_by(self, field_name, field_value) -> Receipt | None:
+        async with self._conn.cursor(row_factory=self.class_row) as cursor:
             query = sql.SQL("SELECT * FROM receipts WHERE {0} = {1}").format(sql.Identifier(field_name), sql.Literal(field_value))
             
-            receipt = cursor.execute(query).fetchone()
-            return receipt
+            receipt = await cursor.execute(query)
+            return await receipt.fetchone()
         
-    def get_by_id(self, receipt_id: int) -> Receipt | None:
-        return self._get_by(field_name="id", field_value=receipt_id)
+    async def get_by_id(self, receipt_id: int) -> Receipt | None:
+        return await self._get_by(field_name="id", field_value=receipt_id)
         
-    def get_history_by_customer_id(self, customer_id: int, limit: int, offset: int) -> list[Receipt] | None:
-        with self._conn.cursor(row_factory=self.class_row) as cursor:
+    async def get_history_by_customer_id(self, customer_id: int, limit: int, offset: int) -> list[Receipt] | None:
+        async with self._conn.cursor(row_factory=self.class_row) as cursor:
             query = sql.SQL(
                 "SELECT * FROM receipts WHERE {0} = {1} ORDER BY id LIMIT {2} OFFSET {3}"
             ).format(
@@ -75,8 +76,8 @@ class ReceiptRepository(GenericRepository):
                 sql.Literal(offset - 1)
             )
 
-            receipts = cursor.execute(query).fetchall()
-            return receipts
+            receipts = await cursor.execute(query)
+            return await receipts.fetchall()
 
-    def get_by_order_id(self, order_id: UUID) -> Receipt | None:
-        return self._get_by(field_name="order_id", field_value=order_id)
+    async def get_by_order_id(self, order_id: UUID) -> Receipt | None:
+        return await self._get_by(field_name="order_id", field_value=order_id)

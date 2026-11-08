@@ -15,6 +15,6 @@ def get_dsn():
 
 
 async def get_connection():
-    with psycopg.connect(get_dsn()) as conn:
+    async with await psycopg.AsyncConnection.connect(get_dsn()) as conn:
         yield conn
 

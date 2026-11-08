@@ -5,7 +5,6 @@ import psycopg
 from fastapi import Request, Response, HTTPException
 from fastapi.routing import APIRoute
 from starlette import status
-from starlette.responses import JSONResponse
 
 from src.core import logger
 from src.middleware.helpers import parse_order_id
@@ -25,14 +24,14 @@ class PaymentRoute(APIRoute):
             body = await read_body(request)
             
             # one connection (and one transaction) for the whole request
-            with psycopg.connect(get_dsn()) as conn:
+            async with await psycopg.AsyncConnection.connect(get_dsn()) as conn:
                 request.state.conn = conn
                 
                 # 1. idempotency: replay the cached response or run the request
                 idempotency = Idempotency(conn)
                 key = request.headers.get(IDEMPOTENCY_HEADER)
                 
-                cached = idempotency.replay(key, request.url.path, body)
+                cached = await idempotency.replay(key, request.url.path, body)
                 if cached is not None:
                     return cached
 
@@ -47,14 +46,14 @@ class PaymentRoute(APIRoute):
                 except IDParsingError:
                     raise HTTPException(detail="Invalid order ID", status_code=status.HTTP_400_BAD_REQUEST)
 
-                error = state_machine.check(request.url.path, order_id)
+                error = await state_machine.check(request.url.path, order_id)
                 if error is not None:
                     return error
 
                 response = await original_route_handler(request)
 
                 # 3. cache the response so the same key can be replayed
-                idempotency.store(key, request.url.path, body, response)
+                await idempotency.store(key, request.url.path, body, response)
                 return response
 
         return custom_route_handler

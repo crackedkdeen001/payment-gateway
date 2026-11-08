@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 
-from psycopg import Connection
+import psycopg 
 from starlette.responses import JSONResponse, Response
 
 from src.core import logger
@@ -13,15 +13,15 @@ IDEMPOTENCY_HEADER = "X-Idempotency-Key"
 
 
 class Idempotency:
-    def __init__(self, connection: Connection):
+    def __init__(self, connection: psycopg.AsyncConnection):
         self.repo = IdempotencyRepository(connection=connection)
 
-    def replay(self, key: str, path: str, body: dict) -> Response | None:
+    async def replay(self, key: str, path: str, body: dict) -> Response | None:
         if not key:
             return None
 
         # if it hasn't been seen before, it is a new request
-        existing = self.repo.get(key, path)
+        existing = await self.repo.get(key, path)
         if existing is None:
             logger.info("New request")
             return None
@@ -36,11 +36,11 @@ class Idempotency:
         return JSONResponse(content=existing.response_body,
                             headers={"X-Idempotent-Replayed": "true"})
 
-    def store(self, key: str, path: str, body: dict, response: Response):
+    async def store(self, key: str, path: str, body: dict, response: Response):
         if not key:
             return
 
-        self.repo.create(IdempotencyKey(
+        await self.repo.create(IdempotencyKey(
             id=None,
             idempotency_key=key,
             request_path=path,
