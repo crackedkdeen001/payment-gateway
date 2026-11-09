@@ -1,22 +1,19 @@
 import json
 from collections.abc import Callable
 
-import psycopg
 from fastapi import Request, Response, HTTPException
 from fastapi.routing import APIRoute
 from starlette import status
 
-from src.core import logger
-from src.middleware.helpers import parse_order_id
+from src.routers.helpers import parse_order_id
 from src.exceptions.exception import IDParsingError
-from src.db import get_dsn
 from src.exceptions import EMPTY_REQUEST_BODY
 from src.middleware.idempotency import IDEMPOTENCY_HEADER, Idempotency
 from src.middleware.state_machine import StateMachine
 
 # Route as middleware
 # To make sure everything error that gets propagated can be handled by the FastAPI exception Handlers
-class PaymentRoute(APIRoute):
+class MiddlewareRoute(APIRoute):
     def get_route_handler(self) -> Callable:
         original_route_handler = super().get_route_handler()
 
@@ -24,7 +21,7 @@ class PaymentRoute(APIRoute):
             body = await read_body(request)
             
             # one connection (and one transaction) for the whole request
-            async with await psycopg.AsyncConnection.connect(get_dsn()) as conn:
+            async with request.app.state.pool.connection() as conn:
                 request.state.conn = conn
                 
                 # 1. idempotency: replay the cached response or run the request
@@ -36,19 +33,18 @@ class PaymentRoute(APIRoute):
                     return cached
 
                 # 2. state machine: is this request allowed to touch the receipt?
-                # state_machine = StateMachine(conn)
-                # try:
-                #     order_id = body.get("order_id", None)
-                #     if order_id is None:
-                #         raise HTTPException(detail="Order ID  is missing", status_code=status.HTTP_400_BAD_REQUEST)
-                #     
-                #     order_id = parse_order_id(order_id)
-                # except IDParsingError:
-                #     raise HTTPException(detail="Invalid order ID", status_code=status.HTTP_400_BAD_REQUEST)
-                # 
-                # error = await state_machine.check(request.url.path, order_id)
-                # if error is not None:
-                #     return error
+                state_machine = StateMachine(conn)
+                try:
+                    order_id = body.get("order_id", None)
+                    if order_id is None:
+                        raise HTTPException(detail="Order ID  is missing", status_code=status.HTTP_400_BAD_REQUEST)
+
+                    order_id = parse_order_id(order_id)
+                    
+                    error = await state_machine.check(request.url.path, order_id)
+                except IDParsingError:
+                    raise HTTPException(detail="Invalid order ID", status_code=status.HTTP_400_BAD_REQUEST)
+
 
                 response = await original_route_handler(request)
 

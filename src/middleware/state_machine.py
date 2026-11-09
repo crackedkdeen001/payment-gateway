@@ -1,12 +1,13 @@
 from uuid import UUID
 
 import psycopg
+from fastapi import HTTPException
 from starlette import status
 from starlette.responses import JSONResponse, Response
 
 from src.core import logger
 from src.exceptions import RECEIPT_DOES_NOT_EXIST
-from src.models import PaymentStates, Receipt
+from src.models import PaymentStates
 from src.repository import ReceiptRepository
 
 # the endpoints that are allowed for each state
@@ -30,8 +31,7 @@ class StateMachine:
         if receipt is None:
             if path == "/authorize":
                 return None
-            return JSONResponse(content={"status": "error", "message": RECEIPT_DOES_NOT_EXIST},
-                                status_code=status.HTTP_404_NOT_FOUND)
+            raise HTTPException(detail=RECEIPT_DOES_NOT_EXIST, status_code=status.HTTP_404_NOT_FOUND)
 
         state = receipt.current_state
 

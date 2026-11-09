@@ -1,13 +1,15 @@
-from typing import Annotated
 from contextlib import asynccontextmanager
+from typing import Annotated
 
 import psycopg
+from psycopg_pool import AsyncConnectionPool
 import uvicorn
 from uuid import UUID
-from fastapi import Depends, FastAPI, Request, Response, status, HTTPException, APIRouter, Query
+from fastapi import Depends, FastAPI, Request, status, HTTPException, APIRouter, Query
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from src.dependencies import get_connection_from_request, get_connection_from_app
 from src.exceptions.exception import IDParsingError
 from src.db.setup import get_dsn
 from src.dtos.requests import (
@@ -26,11 +28,10 @@ from src.dtos.helpers import (
     create_prefixed_customer_id,
     create_prefixed_order_id,
     create_prefixed_receipt_id,
-    OrderID,
-    ReceiptID
+    ReceiptID,
 )
-from src.dependencies import idempotency_header, get_connection
-from src.middleware.route import PaymentRoute
+from src.dependencies import idempotency_header
+from src.routers.middleware import MiddlewareRoute
 from src.models import PaymentStates, Receipt
 from src.repository import ReceiptRepository
 from src.services.bank import BankService
@@ -41,10 +42,14 @@ from src.exceptions import (
     RECEIPT_DOES_NOT_EXIST
 )
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with AsyncConnectionPool(get_dsn()) as pool:
+        app.state.pool = pool
+        yield
+app = FastAPI(lifespan=lifespan)
 
-idempotent_endpoints = APIRouter(route_class=PaymentRoute, dependencies=[Depends(idempotency_header)])
-
+idempotent_endpoints = APIRouter(route_class=MiddlewareRoute, dependencies=[Depends(idempotency_header)], lifespan=lifespan)
 
 @app.exception_handler(RequestValidationError)
 def request_validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -61,7 +66,7 @@ def http_exception_handler(request: Request, exc: HTTPException):
 
 
 @app.exception_handler(IDParsingError)
-def http_exception_handler(request: Request, exc: IDParsingError):
+def id_exception_handler(request: Request, exc: IDParsingError):
     return JSONResponse(content={"status": "error", "message": exc.message}, status_code=status.HTTP_400_BAD_REQUEST)
 
 @app.exception_handler(Exception)
@@ -72,8 +77,7 @@ def general_exception_handler(request: Request, exc: Exception):
 
 # noinspection unresolved-references,bad-argument-type
 @idempotent_endpoints.post("/authorize", summary="Authorize a transaction")
-async def authorize(authorize_request: AuthorizeReceiptRequest, request: Request):
-    conn: psycopg.AsyncConnection = request.state.conn
+async def authorize(authorize_request: AuthorizeReceiptRequest, conn: psycopg.AsyncConnection = Depends(get_connection_from_request)):
     repository = ReceiptRepository(connection=conn)
 
     async with conn.transaction():
@@ -155,8 +159,7 @@ async def authorize(authorize_request: AuthorizeReceiptRequest, request: Request
 
 # noinspection unresolved-references,bad-argument-type
 @idempotent_endpoints.post("/capture", summary="Capture an authorized transaction")
-async def capture(capture_request: CaptureReceiptRequest, request: Request):
-    conn: psycopg.AsyncConnection = request.state.conn
+async def capture(capture_request: CaptureReceiptRequest, conn: psycopg.AsyncConnection = Depends(get_connection_from_request)):
     repository = ReceiptRepository(connection=conn)
 
     async with conn.transaction():
@@ -201,8 +204,7 @@ async def capture(capture_request: CaptureReceiptRequest, request: Request):
 
 # noinspection bad-argument-type,unresolved-references
 @idempotent_endpoints.post("/void", summary="Void an authorized transaction")
-async def void(void_request: VoidReceiptRequest, request: Request):
-    conn: psycopg.AsyncConnection = request.state.conn
+async def void(void_request: VoidReceiptRequest, conn: psycopg.AsyncConnection = Depends(get_connection_from_request)):
     repository = ReceiptRepository(connection=conn)
     
     async with conn.transaction():
@@ -244,8 +246,7 @@ async def void(void_request: VoidReceiptRequest, request: Request):
 
 # noinspection unresolved-references,bad-argument-type
 @idempotent_endpoints.post("/refund", summary="Refund a captured transaction")
-async def refund(request: Request, refund_request: RefundReceiptRequest):
-    conn: psycopg.AsyncConnection = request.state.conn
+async def refund(refund_request: RefundReceiptRequest, conn: psycopg.AsyncConnection = Depends(get_connection_from_request)):
     repository = ReceiptRepository(connection=conn)
 
     async with conn.transaction():
@@ -286,70 +287,67 @@ async def refund(request: Request, refund_request: RefundReceiptRequest):
         )
 
 @app.get("/status", summary="Get payment status of a receipt")
-async def get_payment_status(order_id:Annotated[OrderID, Query()]):
-   async with await psycopg.AsyncConnection.connect(get_dsn()) as conn: 
-        repository = ReceiptRepository(connection=conn)
-        receipt = await repository.get_by_order_id(UUID(order_id.removeprefix("orx_")))
+async def get_payment_status(order_id, conn: psycopg.AsyncConnection = Depends(get_connection_from_app)):
+    repository = ReceiptRepository(connection=conn)
+    receipt = await repository.get_by_order_id(UUID(order_id.removeprefix("orx_")))
 
-        if receipt is None:
-            raise HTTPException(detail=RECEIPT_DOES_NOT_EXIST, status_code=status.HTTP_404_NOT_FOUND)
-        
-        return GeneralResponseFields(
-            receipt_id=create_prefixed_receipt_id(receipt.id),
-            order_id=create_prefixed_order_id(receipt.order_id),
-            customer_id=create_prefixed_customer_id(receipt.customer_id),
-            status=receipt.current_state,
-            amount=receipt.amount_in_cents
-        )
+    if receipt is None:
+        raise HTTPException(detail=RECEIPT_DOES_NOT_EXIST, status_code=status.HTTP_404_NOT_FOUND)
+    
+    return GeneralResponseFields(
+        receipt_id=create_prefixed_receipt_id(receipt.id),
+        order_id=create_prefixed_order_id(receipt.order_id),
+        customer_id=create_prefixed_customer_id(receipt.customer_id),
+        status=receipt.current_state,
+        amount=receipt.amount_in_cents
+    )
    
 @app.get("/history", summary="Get the payment history of a customer")
-async def get_customer_history(payment_history_params:Annotated[PaymentHistoryRequest, Query()]):
-    async with await psycopg.AsyncConnection.connect(get_dsn()) as conn:
-        repository = ReceiptRepository(connection=conn)
-        
-        customer_id = int(payment_history_params.customer_id.removeprefix("cux_"))
-        
-        receipts = await repository.get_history_by_customer_id(
-            customer_id,
-            payment_history_params.limit,
-            payment_history_params.offset
-        )
-        
-        if not receipts:
-            return JSONResponse(content={"detail":"No history found"}, status_code=status.HTTP_404_NOT_FOUND)
-        
-        processed_receipts = []
-        for receipt in receipts:
-            processed_receipts.append(
-                GeneralResponseFields(
-                    receipt_id=create_prefixed_receipt_id(receipt.id),
-                    order_id=create_prefixed_order_id(receipt.order_id),
-                    customer_id=create_prefixed_customer_id(receipt.customer_id),
-                    status=receipt.current_state,
-                    amount=receipt.amount_in_cents
-                )
+async def get_customer_history(payment_history_params:Annotated[PaymentHistoryRequest, Query()], conn: psycopg.AsyncConnection = Depends(get_connection_from_app)):
+    repository = ReceiptRepository(connection=conn)
+    
+    customer_id = int(payment_history_params.customer_id.removeprefix("cux_"))
+    
+    receipts = await repository.get_history_by_customer_id(
+        customer_id,
+        payment_history_params.limit,
+        payment_history_params.offset
+    )
+    
+    if not receipts:
+        return JSONResponse(content={"detail":"No history found"}, status_code=status.HTTP_404_NOT_FOUND)
+    
+    processed_receipts = []
+    for receipt in receipts:
+        processed_receipts.append(
+            GeneralResponseFields(
+                receipt_id=create_prefixed_receipt_id(receipt.id),
+                order_id=create_prefixed_order_id(receipt.order_id),
+                customer_id=create_prefixed_customer_id(receipt.customer_id),
+                status=receipt.current_state,
+                amount=receipt.amount_in_cents
             )
-        
-        return PaymentHistoryResponse(
-            total=len(processed_receipts),
-            page=payment_history_params.offset,
-            receipts=processed_receipts
-        )            
+        )
+    
+    return PaymentHistoryResponse(
+        total=len(processed_receipts),
+        page=payment_history_params.offset,
+        receipts=processed_receipts
+    )            
             
 @app.get("/verify", summary="Verify goods have been paid for before shipping")
-async def verify_goods(receipt_id: ReceiptID):
-    async with await psycopg.AsyncConnection.connect(get_dsn()) as conn:
-        repository = ReceiptRepository(connection=conn)
-        
-        receipt = await repository.get_by_id(int(receipt_id.removeprefix("rex_")))
-        
-        if receipt is None:
-            raise HTTPException(detail=RECEIPT_DOES_NOT_EXIST, status_code=status.HTTP_404_NOT_FOUND)
-        
-        if receipt.current_state == PaymentStates.CAPTURED:
-            return JSONResponse(content={"status":"Eligible for shipping"})
-        else:
-            return JSONResponse(content={"status":"Not eligible for shipping"})
+async def verify_goods(receipt_id: ReceiptID, conn: psycopg.AsyncConnection = Depends(get_connection_from_app)):
+    repository = ReceiptRepository(connection=conn)
+    
+    receipt = await repository.get_by_id(int(receipt_id.removeprefix("rex_")))
+    
+    if receipt is None:
+        raise HTTPException(detail=RECEIPT_DOES_NOT_EXIST, status_code=status.HTTP_404_NOT_FOUND)
+    
+    if receipt.current_state == PaymentStates.CAPTURED:
+        return JSONResponse(content={"status":"Eligible for shipping"})
+    else:
+        return JSONResponse(content={"status":"Not eligible for shipping"})
 
 
 app.include_router(idempotent_endpoints)

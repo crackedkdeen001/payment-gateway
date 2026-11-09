@@ -12,5 +12,11 @@ async def idempotency_header(X_Idempotency_Key: Annotated[str, Header()]):
         raise HTTPException(detail=IDEMPOTENCY_KEY_TOO_LONG, status_code=status.HTTP_400_BAD_REQUEST)
     return {"X-Idempotency-Key": X_Idempotency_Key}
 
-async def get_connection(request: Request):
-    return request.state.conn
+
+async def get_connection_from_request(request: Request):
+    yield request.state.conn
+
+
+async def get_connection_from_app(request: Request):
+    async with request.app.state.pool.connection() as conn:
+        yield conn
