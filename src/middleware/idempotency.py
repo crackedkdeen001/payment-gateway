@@ -1,7 +1,8 @@
 import json
 from datetime import datetime
 
-import psycopg 
+import psycopg
+from starlette import status
 from starlette.responses import JSONResponse, Response
 
 from src.core import logger
@@ -30,7 +31,7 @@ class Idempotency:
         if existing.request_body != body:
             return JSONResponse(
                 content={"status": "error", "message": DIFFERENT_PARAMS_WITH_SAME_IDEMPOTENCY_KEY},
-                status_code=409)
+                status_code=status.HTTP_409_CONFLICT)
 
         logger.info("Returning cached response from idempotency table")
         return JSONResponse(content=existing.response_body,
@@ -40,12 +41,14 @@ class Idempotency:
         if not key:
             return
 
-        await self.repo.create(IdempotencyKey(
-            id=None,
-            idempotency_key=key,
-            request_path=path,
-            request_body=body,
-            response_body=json.loads(response.body),
-            response_code=response.status_code,
-            created_at=datetime.now(),
-        ))
+        await self.repo.create(
+            IdempotencyKey(
+                id=None,
+                idempotency_key=key,
+                request_path=path,
+                request_body=body,
+                response_body=json.loads(response.body),
+                response_code=response.status_code,
+                created_at=datetime.now(),
+            )
+        )

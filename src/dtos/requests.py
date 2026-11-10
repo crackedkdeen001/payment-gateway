@@ -1,12 +1,34 @@
-from typing import Annotated
+from typing import Annotated, Any
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from .helpers import OrderID, CustomerID, ReceiptID, PositiveAmount, ValidMonth, ValidYear, ValidCurrency
+from src.dtos.helpers import (
+    OrderID,
+    CustomerID,
+    ReceiptID,
+    PositiveAmount,
+    ValidMonth,
+    ValidYear,
+    ValidCurrency,
+    order_prefix,
+    receipt_prefix,
+    customer_prefix,
+)
 
 
 class GenericReceiptRequest(BaseModel):
     order_id: OrderID
+    
+    # converts prefix ID to native type to native type 
+    def model_post_init(self, context: Any, /) -> None:
+        self.order_id = UUID(self.order_id.removeprefix(order_prefix))
+        
+        if type(self).model_fields.get("receipt_id", None):
+            self.receipt_id = int(self.receipt_id.removeprefix(receipt_prefix))
+
+        if type(self).model_fields.get("customer_id", None):
+            self.customer_id = int(self.customer_id.removeprefix(customer_prefix))
 
 class AuthorizeReceiptRequest(GenericReceiptRequest):
     customer_id: CustomerID
@@ -30,7 +52,6 @@ class RefundReceiptRequest(ParamsForReceiptIDDependentEndpoints):
     amount: PositiveAmount
     
 class PaymentHistoryRequest(BaseModel):
-    customer_id: CustomerID
     limit: PositiveAmount
     offset: PositiveAmount
     
