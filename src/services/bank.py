@@ -1,6 +1,7 @@
 import asyncio
 
 import math
+from uuid import UUID
 
 import httpx2
 
@@ -26,7 +27,7 @@ def is_not_retryable(retry_count):
 
 class BankService:
     @classmethod
-    async def __request(cls, url: str, request_class: BankRequest, response_class: BankResponse, idempotency_key: str):
+    async def __request(cls, url: str, request_class: BankRequest, response_class: BankResponse, idempotency_key: UUID):
         async with AsyncClient() as client:
             for attempts in range(1, settings.MAX_RETRY + 1):
                 try:
@@ -34,7 +35,7 @@ class BankService:
                     logger.info(f"Request Made to the Bank in.... {wait_in_milliseconds}, retry_count: {attempts}")
                     await asyncio.sleep(wait_in_milliseconds)
                     
-                    response = await client.post(url=url, json=request_class.model_dump(), headers={"idempotency-key":idempotency_key}, timeout=100)
+                    response = await client.post(url=url, json=request_class.model_dump(), headers={"idempotency-key":str(idempotency_key)}, timeout=100)
                     if response.status_code == status.HTTP_200_OK:
                         return response_class(**response.json())
                     

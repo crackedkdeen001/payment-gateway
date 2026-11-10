@@ -304,8 +304,14 @@ async def get_payment_status(order_id, conn: psycopg.AsyncConnection = Depends(g
     if receipt is None:
         raise HTTPException(detail=RECEIPT_DOES_NOT_EXIST, status_code=status.HTTP_404_NOT_FOUND)
 
-    return GeneralResponseFields
-
+        return GeneralResponseFields(
+            receipt_id=receipt.id,
+            order_id=receipt.order_id,
+            customer_id=receipt.customer_id,
+            status=receipt.current_state,
+            amount=receipt.amount_in_cents
+        )
+   
 
 @app.get("/history/{customer_id}", summary="Get the payment history of a customer")
 async def get_customer_history(customer_id:CustomerID,
